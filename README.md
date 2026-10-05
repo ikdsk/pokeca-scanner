@@ -1,3 +1,11 @@
+# Pokéca Scanner — ポケモンカード（日本語版）スキャナー
+
+MTG版スキャナー（Mana Peek, `ikdsk/mtg-card-scanner` release/issue22）をベースにした開発中のポケカ版です。
+開発計画は `docs/development-plan.md`、契約は `docs/contracts.md`、運用は `AGENTS.md`。
+**現時点のコードはMTG版のままで、ポケカ対応はIssue #2〜#5で進行中です。** 以下はMTG版から引き継いだ手順です。
+
+---
+
 # MTG Card Scanner — ローカル検証用MVP
 
 Vite + TypeScriptの日本語モバイルUI。端末内のCollectorVision/WASM認識、
