@@ -33,11 +33,26 @@ const record = (value: unknown): Record<string, unknown> | null =>
   typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : null;
 const text = (value: unknown): string | null => typeof value === 'string' && value !== '' ? value : null;
 const count = (value: unknown): number | null => typeof value === 'number' && Number.isFinite(value) ? value : null;
+// Catalog set names/codes that cannot be read as "CODE: Name", mapped to the TCGdex ja set id.
+// Only entries verified against https://api.tcgdex.net/v2/ja (docs/reports/resolve-fallback.md); never guess.
+// SM1+..SM5+ exist in TCGdex as empty stubs: their cards live under SM1p..SM5p.
+const SET_ALIAS: Readonly<Record<string, string>> = {
+  'Start Deck 100 Battle Collection': 'MC',
+  'SV-P Promotional Cards': 'SV-P',
+  'M-P Promotional Cards': 'M-P',
+  'sm1+': 'SM1p', 'SM2+': 'SM2p', 'SM3+': 'SM3p', 'SM4+': 'SM4p', 'SM5+': 'SM5p',
+};
+export function tcgdexSetId(set: string): string | null {
+  const name = set.trim();
+  const code = name.split(':')[0]!.trim();
+  const id = Object.hasOwn(SET_ALIAS, name) ? SET_ALIAS[name] : Object.hasOwn(SET_ALIAS, code) ? SET_ALIAS[code] : code;
+  return id !== undefined && CODE.test(id) ? id : null;
+}
 export function candidateTcgdexId(meta: CatalogMeta): string | null {
   if (typeof meta.set !== 'string' || typeof meta.collector_number !== 'string') return null;
-  const setId = meta.set.split(':')[0]!.trim();
+  const setId = tcgdexSetId(meta.set);
   const localId = meta.collector_number.split('/')[0]!.trim();
-  return CODE.test(setId) && CODE.test(localId) ? `${setId}-${localId}` : null;
+  return setId !== null && CODE.test(localId) ? `${setId}-${localId}` : null;
 }
 function imageUrl(image: unknown): string | null {
   if (typeof image !== 'string') return null;
@@ -53,8 +68,8 @@ const hasTcgplayerRef = (variants: unknown[]): boolean =>
 function setNumberMatches(c: Record<string, unknown>, variants: unknown[], meta: CatalogMeta | undefined): boolean {
   if (hasTcgplayerRef(variants) || !meta || typeof meta.set !== 'string' || typeof meta.collector_number !== 'string') return false;
   const set = record(c.set);
-  const metaSet = meta.set.split(':')[0]!.trim();
-  if (typeof set?.id !== 'string' || set.id.toLowerCase() !== metaSet.toLowerCase()) return false;
+  const metaSet = tcgdexSetId(meta.set);
+  if (typeof set?.id !== 'string' || metaSet === null || set.id.toLowerCase() !== metaSet.toLowerCase()) return false;
   const [left = ''] = meta.collector_number.split('/');
   const wanted = numeric(left.trim());
   return wanted !== null && typeof c.localId === 'string' && numeric(c.localId) === wanted;

@@ -340,10 +340,28 @@ function cardInfoErrorText(error: Error): string {
   if (error instanceof TypeError) return `通信に失敗しました。接続を確認し、${retry}`;
   return `カード情報を取得できません。通信を確認し、${retry}`;
 }
+// #16: when the top product has no Japanese card, show the best of the next top matches (cap 5) that has one,
+// with that product's own id/score. The returned `shown` keeps the observation's version/identity.
+async function resolveSuggestion(next: Suggestion): Promise<{ shown: Suggestion; known: PokeCard | null }> {
+  const known = await cardInfo.get(next.cardId);
+  if (known) return { shown: next, known };
+  const matches = matchesById.get(next.cardId) ?? [];
+  const others = matches.slice(0, 5).filter(match => match.cardId !== next.cardId);
+  const cards = await Promise.all(others.map(resolveMatch));
+  const index = cards.findIndex(card => card !== null);
+  if (index < 0) return { shown: next, known: null };
+  const match = others[index]!; matchesById.set(match.cardId, matches);
+  return { shown: { ...next, cardId: match.cardId, score: match.score }, known: cards[index]! };
+}
 function presentSuggestion(next: Suggestion | null): void {
   // Sticky: nothing observed ever clears a shown card; only a newer verified card replaces it.
   if (!next) return;
-  if (suggestion?.version === next.version) { if (shown === suggestionCard) tentativeScore.textContent = `類似度 ${next.score.toFixed(3)}`; return; }
+  if (suggestion?.version === next.version) {
+    // The score must belong to the displayed product: after a fallback, `suggestion.cardId` is not the observed top id.
+    const score = next.cardId === suggestion.cardId ? next.score : matchesById.get(next.cardId)?.find(match => match.cardId === suggestion!.cardId)?.score;
+    if (shown === suggestionCard && score !== undefined) tentativeScore.textContent = `類似度 ${score.toFixed(3)}`;
+    return;
+  }
   if (loadingSuggestion?.version === next.version || queuedVerified?.next.version === next.version) return;
   loadingSuggestion = next; cardInfo.cancelExcept(next.cardId); resolveStatus.textContent = '';
   if (!suggestion) { emptyCandidate.hidden = false; emptyCandidate.textContent = 'カード情報を確認中…'; }
@@ -353,22 +371,22 @@ function presentSuggestion(next: Suggestion | null): void {
     if (loadingSuggestion?.version === next.version) loadingSuggestion = null;
     resolveStatus.textContent = note; if (!suggestion) emptyCandidate.textContent = idleText;
   };
-  void cardInfo.get(next.cardId).then(known => {
+  void resolveSuggestion(next).then(({ shown: view, known }) => {
     if (loadingSuggestion?.version !== next.version || !tentative.current(next)) return;
     const card = known && withProductRarity(known);
     if (!card) { settle('カード情報を確認できない候補は表示しません（TCGdexに未登録のカードの可能性）'); return; }
-    const canonical = identity.learn(next.cardId, card.tcgdexId);
+    const canonical = identity.learn(view.cardId, card.tcgdexId);
     // Same displayed card under another product id: adopt silently, no flicker and no new proposal.
     if (suggestionCard?.tcgdexId === card.tcgdexId) {
-      suggestion = next; loadingSuggestion = null;
+      suggestion = view; loadingSuggestion = null;
       // A rearmed (re-presented) card can be saved again; another product id of a saved card cannot.
-      if (canonical !== next.cardId && savedVersion !== null) savedVersion = next.version;
-      if (canonical === next.cardId && savedVersion !== null && !staticView) { savedVersion = null; savedCardId = null; confirm.textContent = '履歴に保存'; tentativeMessage.textContent = '実物のカード（版・状態）は未確認'; }
+      if (canonical !== view.cardId && savedVersion !== null) savedVersion = view.version;
+      if (canonical === view.cardId && savedVersion !== null && !staticView) { savedVersion = null; savedCardId = null; confirm.textContent = '履歴に保存'; tentativeMessage.textContent = '実物のカード（版・状態）は未確認'; }
       return;
     }
-    if (canonical !== next.cardId && handled.has(canonical)) { settle(''); return; }
-    if (holdLive()) { queuedVerified = { next, card }; loadingSuggestion = null; return; }
-    commitSuggestion(next, card);
+    if (canonical !== view.cardId && handled.has(canonical)) { settle(''); return; }
+    if (holdLive()) { queuedVerified = { next: view, card }; loadingSuggestion = null; return; }
+    commitSuggestion(view, card);
   }).catch((error: unknown) => {
     const failure = error instanceof Error ? error : new Error(String(error));
     mark('card-info-error', { name: failure.name, message: failure.message, tcgdexId: candidateTcgdexId(metaById.get(next.cardId) ?? {}) });
