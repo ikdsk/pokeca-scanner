@@ -14,7 +14,7 @@
 //   { type: 'result',   cardPresent, cornersValid, corners, sharpness,
 //                       confidence, cardId (TCGplayer product id), cardName,
 //                       catalogMeta {set, collectorNumber, rarity, group},
-//                       topMatches [{cardId, cardName, score}], score, margin,
+//                       topMatches [{cardId, cardName, catalogMeta, score}], score, margin,
 //                       rawCorners, detectorInput,
 //                       detectorBitmap?, cropBitmap? }
 //   { type: 'error',    message }
@@ -911,6 +911,7 @@ class WorkerRuntime {
       topMatches: top.map(({ index, score }) => ({
         cardId: this.cardIds[index],
         cardName: this.cardNames?.[index] ?? null,
+        catalogMeta: this.catalogMeta?.[index] ?? null,
         score,
       })),
     };

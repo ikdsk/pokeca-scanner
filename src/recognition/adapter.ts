@@ -2,7 +2,7 @@ import { manifest } from './manifest.js';
 import type { Candidate } from './gate.js';
 /** Record metadata of the matched catalog row (tcgplayer/pokemon-japan); fields are null when the catalog lacks them. */
 export type CatalogMeta = { set: string | null; collectorNumber: string | null; rarity: string | null; group: string | null };
-export type TopMatch = { cardId: string; cardName: string | null; score: number };
+export type TopMatch = { cardId: string; cardName: string | null; catalogMeta?: CatalogMeta | null; score: number };
 /** `cardId` is the TCGplayer product id (decimal string). */
 export type RecognitionResult = Candidate & {
   margin: number; corners?: unknown; timing?: Record<string, number>;
