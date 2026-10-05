@@ -25,10 +25,17 @@ const dex = (id: string, localId: string, name: string, setId: string, setName: 
   image: `https://assets.tcgdex.net/ja/TST/${setId}/${localId}`, set: { id: setId, name: setName, cardCount: { official: 66 } }, ...extra,
 });
 export const tcgdexCards: Record<string, Dex> = {
-  'TST-001': dex('TST-001', '001', 'テストA', 'TST', 'テスト拡張', { variants_detailed: [{ type: 'normal', thirdParty: { tcgplayer: 900001 } }, { type: 'pokeball', thirdParty: { tcgplayer: 900011 } }] }),
-  'TST-002': dex('TST-002', '002', 'テストB', 'TST', 'テスト拡張', { rarity: 'R', regulationMark: 'H', variants_detailed: [{ type: 'normal', thirdParty: { tcgplayer: 900002 } }] }),
+  'TST-001': dex('TST-001', '001', 'テストA', 'TST', 'テスト拡張', {
+    // SYNTHETIC card text, field shapes copied from real TCGdex ja JSON (SV4K-015 / SV4K-001); wording invented.
+    illustrator: '合成イラスト太郎', types: ['Fire'], stage: 'Stage1', evolveFrom: 'テスト進化前', description: '合成の図鑑文です。',
+    abilities: [{ type: 'Ability', name: 'テスト特性', effect: '特性の効果文。\n二行目の効果文。' }],
+    attacks: [{ cost: ['Colorless', 'Colorless'], name: 'テストワザ', effect: 'ワザの効果文。', damage: '40+' }, { cost: ['Fire'], name: 'ダメージだけ', damage: 30 }],
+    weaknesses: [{ type: 'Water', value: '×2' }], resistances: [{ type: 'Fighting', value: '-30' }], retreat: 0,
+    variants_detailed: [{ type: 'normal', thirdParty: { tcgplayer: 900001 } }, { type: 'pokeball', thirdParty: { tcgplayer: 900011 } }] }),
+  'TST-002': dex('TST-002', '002', 'テストB', 'TST', 'テスト拡張', { rarity: 'R', regulationMark: 'H', category: 'Trainer', hp: undefined, illustrator: '合成トレーナー絵', trainerType: 'Supporter', effect: 'トレーナーの効果文。\n山札を切る。', variants_detailed: [{ type: 'normal', thirdParty: { tcgplayer: 900002 } }] }),
   'TST-003': dex('TST-003', '003', 'テストC', 'TST', 'テスト拡張', { variants_detailed: [{ type: 'normal', thirdParty: { tcgplayer: 900003 } }] }),
-  'TST-004': dex('TST-004', '004', 'テストE', 'TST', 'テスト拡張', { variants_detailed: [{ type: 'normal', thirdParty: { tcgplayer: 900004 } }] }),
+  'TST-004': dex('TST-004', '004', 'テストE', 'TST', 'テスト拡張', { hp: undefined, // SYNTHETIC: TCGdex has no card text for this one
+    variants_detailed: [{ type: 'normal', thirdParty: { tcgplayer: 900004 } }] }),
   'TST-005': dex('TST-005', '005', 'テストF', 'TST', 'テスト拡張', { variants_detailed: [{ type: 'normal', thirdParty: { tcgplayer: 900005 } }] }),
   'TST-006': dex('TST-006', '006', 'テストG', 'TST', 'テスト拡張', { variants_detailed: [{ type: 'normal', thirdParty: { tcgplayer: 900006 } }] }),
   // No tcgplayer cross reference at all: matched by set code + number (matchMethod set_number).

@@ -34,6 +34,7 @@ describe('parseTcgdexCard', () => {
       tcgplayerId: '565756', tcgdexId: 'SV4K-001', nameJa: 'ヤナップ', setId: 'SV4K', setNameJa: '古代の咆哮', localId: '001',
       officialCount: 66, rarity: 'Common', regulationMark: 'G', category: 'Pokemon', hp: 70,
       imageUrl: 'https://assets.tcgdex.net/ja/SV/SV4K/001/high.webp', variant: 'normal', matchMethod: 'tcgplayer_id',
+      text: { category: 'Pokemon', hp: 70 }, // only the text fields present in this fixture
     });
   });
 });

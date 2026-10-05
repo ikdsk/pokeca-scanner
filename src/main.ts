@@ -2,6 +2,7 @@ import './ui/style.css';
 import { el, button, label } from './ui/dom.js';
 import { closeIconButton } from './ui/close-button.js';
 import { cameraIcon, gearIcon, upArrowIcon } from './ui/icons.js';
+import { renderCardText } from './ui/card-text.js';
 import { resolveCard, candidateTcgdexId, type PokeCard } from './data/pokemon.js';
 import { createTcgplayerPrice } from './data/tcgplayer-price.js';
 import { FxProvider } from './data/fx.js';
@@ -88,7 +89,8 @@ const nameDetails = button('', () => openCandidateDetail(), 'candidate-name-targ
 const imageDetails = button('', () => openCandidateDetail(), 'candidate-image-target'); imageDetails.setAttribute('aria-label', '画像から詳細を見る');
 tentativeSummary.append(nameDetails, imageDetails, tentativePrice);
 // Detail order: status message, price sources, 晴れる屋2 link, other products of the same card.
-tentativeDetails.append(tentativeMessage, tentativeSources, tentativeLink);
+const cardTextSlot = el('div', '', 'card-text-slot');
+tentativeDetails.append(tentativeMessage, tentativeSources, tentativeLink, cardTextSlot);
 tentativePanel.append(tentativeSummary, tentativeActions, tentativeDetails, announcement);
 const resolveStatus = el('p', '', 'small muted'); resolveStatus.setAttribute('role', 'status'); cameraInfo.append(resolveStatus);
 const settingsPanel = el('details', '', 'recognition-settings'); settingsPanel.append(el('summary', '認識設定（デバッグ）'), el('p', 'このタブのみ。再読み込みで初期値に戻ります。類似度は未較正の cosine 値で、確率ではありません。', 'small'));
@@ -381,6 +383,7 @@ function showCard(card: PokeCard): void {
   tentativeName.textContent = view.name; tentativeNameLine.replaceChildren(tentativeName, ...rarityNodes(view)); tentativeExpansion.textContent = view.expansion;
   tentativeMeta.replaceChildren(...metaNodes(view), tentativeScore);
   tentativeReference.update(card); tentativeLink.textContent = view.hare2.label; tentativeLink.href = view.hare2.href; tentativeLink.hidden = false;
+  cardTextSlot.replaceChildren(renderCardText(card.text));
   void candidatePrice.select(card);
   if (!staticView) void loadProducts(card, suggestionMatches, revision);
 }
