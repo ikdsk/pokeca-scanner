@@ -10,7 +10,7 @@ import { ScanHistoryView } from './ui/scan-history.js';
 import { ReferenceImage } from './ui/reference-image.js';
 import { PriceSession } from './ui/price-session.js';
 import { priceView } from './ui/price-view.js';
-import { candidateView, thumbnailUrl } from './ui/candidate-view.js';
+import { candidateView, thumbnailUrls } from './ui/candidate-view.js';
 import { createSnapshotLoader } from './ui/snapshot-loader.js';
 import { CardIdentity } from './ui/card-identity.js';
 import { RearmTracker } from './ui/rearm.js';
@@ -437,8 +437,8 @@ function openAlternatives(): void {
 function renderAlternatives(): void {
   alternativesList.replaceChildren(...alternatives.map(entry => {
     const item = el('li'); const control = button('', () => chooseAlternative(entry), 'alternative-item');
-    const view = candidateView(entry.card); const url = thumbnailUrl(entry.card.imageUrl);
-    if (url) { const image = el('img'); image.alt = ''; image.width = 48; image.height = 67; image.decoding = 'async'; image.referrerPolicy = 'no-referrer'; image.onerror = () => image.remove(); image.src = url; control.append(image); }
+    const view = candidateView(entry.card); const urls = thumbnailUrls(entry.card);
+    if (urls.length) { const image = el('img'); image.alt = ''; image.width = 48; image.height = 67; image.decoding = 'async'; image.referrerPolicy = 'no-referrer'; let next = 0; image.onerror = () => { if (++next < urls.length) image.src = urls[next]!; else image.remove(); }; image.src = urls[0]!; control.append(image); }
     const text = el('span', '', 'alternative-text'); text.append(el('strong', view.name), el('span', view.expansion, 'small'), el('span', `類似度 ${entry.score.toFixed(3)}${entry.current ? ' · 現在の候補' : ''}`, 'small muted'));
     control.append(text); item.append(control); return item;
   }));
