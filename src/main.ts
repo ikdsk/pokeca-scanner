@@ -1,26 +1,31 @@
 import './ui/style.css';
 import { el, button, label } from './ui/dom.js';
-import { Repository, FxProvider } from './data/repository.js';
-import type { Card, Face } from './data/cards.js';
+import { resolveCard, type PokeCard } from './data/pokemon.js';
+import { createTcgplayerPrice } from './data/tcgplayer-price.js';
+import { FxProvider } from './data/fx.js';
 import { ScanHistory } from './ui/scan-history-model.js';
 import { ScanHistoryView } from './ui/scan-history.js';
-import { FormatLegality } from './ui/format-legality.js';
 import { ReferenceImage } from './ui/reference-image.js';
-import { ResultSession } from './ui/session.js';
-import { formatReferencePrice } from './domain/pricing.js';
-import { Recognizer } from './recognition/adapter.js';
+import { PriceSession } from './ui/price-session.js';
+import { priceView } from './ui/price-view.js';
+import { candidateView } from './ui/candidate-view.js';
+import { createSnapshotLoader } from './ui/snapshot-loader.js';
+import { CardIdentity } from './ui/card-identity.js';
+import { RearmTracker } from './ui/rearm.js';
+import { Recognizer, type RecognitionResult } from './recognition/adapter.js';
 import { LiveCandidate, type Suggestion } from './recognition/live-candidate.js';
 import { defaults, bounds, validateSettings, type RecognitionSettings } from './recognition/settings.js';
 import { CandidateMetadata } from './ui/candidate-metadata.js';
 import { DetectionOverlay } from './ui/detection-overlay.js';
 import { captureCameraFrame } from './ui/camera-geometry.js';
 
+
 const marks: { event: string; ms: number; detail?: unknown }[] = [];
 function mark(event: string, detail?: unknown): void { marks.push({ event, ms: performance.now(), detail }); if (marks.length > 300) marks.shift(); performance.clearMarks(event); performance.mark(event); }
 mark('shell-start');
-const repo = new Repository(); const fx = new FxProvider();
+const fx = new FxProvider(); const prices = createTcgplayerPrice(createSnapshotLoader());
 const app = document.querySelector<HTMLDivElement>('#app')!;
-const header = el('header'); header.append(el('h1', 'MTG Scanner'));
+const header = el('header'); header.append(el('h1', 'ポケカスキャナー'));
 const scan = el('section', '', 'panel scan-panel');
 const viewport = el('div', '', 'viewport');
 const video = el('video'); video.muted = true; video.playsInline = true; video.autoplay = true;
@@ -40,40 +45,36 @@ const fileLabel = label('端末の画像でスキャン', file); fileLabel.class
 scanActions.append(start, stop, fileLabel, modelRetry);
 const cameraInfo = el('div', '', 'camera-info'); cameraInfo.append(cameraStatus, detectionStatus, modelStatus);
 scan.append(viewport, cameraInfo);
-const searchPanel = el('section', '', 'panel search-panel'); searchPanel.append(el('h2', 'カード名で検索'));
-const searchForm = el('form', '', 'search-form'); const query = el('input'); query.type = 'search'; query.placeholder = '例：稲妻 / Lightning Bolt'; query.required = true; query.setAttribute('aria-label', '日本語・英語のカード名');
-const submit = el('button', '検索', 'primary'); submit.type = 'submit'; searchForm.append(query, submit);
-const searchStatus = el('p', '', 'status'); searchStatus.setAttribute('role', 'status');
-const searchResults = el('div', '', 'search-results'); const more = button('検索結果をさらに表示', () => { void searchMore(); }); more.hidden = true;
-searchPanel.append(searchForm, searchStatus, searchResults, more);
+const imagePanel = el('section', '', 'panel image-panel'); imagePanel.append(el('h2', '端末の画像でスキャン'), el('p', '画像は端末内だけで処理し、外部へ送信しません。', 'small muted'));
 const result = el('section', '', 'panel result'); result.hidden = true; result.setAttribute('aria-label', 'カード情報');
 const footer = el('footer');
-footer.append(el('p', '海外参考価格 · 国内販売・買取価格ではありません。自動認識は候補です。実物の版・言語・加工を確認してください。'));
+footer.append(el('p', '海外参考価格 · 国内販売・買取価格ではありません。自動認識は候補です。実物のカード（版・状態）を確認してください。'));
 const sources = el('p');
-for (const [name, href] of [['Scryfall', 'https://scryfall.com'], ['Frankfurter / ECB', 'https://frankfurter.dev'], ['CollectorVision', 'https://github.com/HanClinto/CollectorVision']]) {
+for (const [name, href] of [['TCGdex', 'https://tcgdex.dev'], ['TCGplayer（TCGCSV経由）', 'https://tcgcsv.com'], ['Frankfurter / ECB', 'https://frankfurter.dev'], ['CollectorVision', 'https://github.com/HanClinto/CollectorVision']]) {
   const a = el('a', name); a.href = href!; a.target = '_blank'; a.rel = 'noopener noreferrer'; sources.append(a, document.createTextNode(' · '));
 }
-footer.append(sources, el('p', 'ローカル・内部検証版。認識コードとモデルはAGPL-3.0。公開・配布前にライセンス対応と公開承認が必要です。カードの権利はWizards of the Coast等の権利者に帰属します。', 'small'));
+footer.append(sources, el('p', 'ローカル・内部検証版。認識コードとモデルはAGPL-3.0。公開・配布前にライセンス対応と公開承認が必要です。ポケモンカードの権利は株式会社ポケモン等の権利者に帰属します。', 'small'));
 const notices = el('a', '第三者ライセンスと利用条件'); notices.href = '/recognition/THIRD-PARTY-NOTICES.md'; footer.append(notices);
-const privacy = el('details'); privacy.append(el('summary', '通信・プライバシーの詳細'), el('p', 'カードIDや検索語をScryfallに、USD/JPYの通貨ペアをFrankfurterに送信します。認識用のコード・モデル・辞書はjsDelivr、Hugging Face、CollectorVisionCatalogから取得します。提供元には通常の通信情報が渡ります。参照画像はScryfallの画像配信元から取得します。撮影・選択画像は保存せず、解析ログはこのタブのメモリ内のみです。分析サービスへの送信はありません。'));
+const privacy = el('details'); privacy.append(el('summary', '通信・プライバシーの詳細'), el('p', '候補カードのセット名・番号をTCGdex（api.tcgdex.net）に送信し、参照画像はassets.tcgdex.netから取得します。価格はTCGCSV由来のスナップショットをこのアプリ自身の配信元（/prices/pokemon-japan-usd.json）から読み込み、価格取得のために外部へ送信しません。USD/JPYの通貨ペアをFrankfurterに送信します。認識用のコード・モデル・辞書はjsDelivr、Hugging Face、CollectorVisionCatalogから取得します。提供元には通常の通信情報が渡ります。晴れる屋2はリンクをタップするまで通信せず、価格や内容の取得・保存・再表示はしません。撮影・選択画像は保存・送信せず、解析ログはこのタブのメモリ内のみです。分析サービスへの送信はありません。'));
 footer.append(privacy);
 const debug = el('details'); debug.append(el('summary', '端末内の計測ログ')); const debugOutput = el('pre');
 debug.append(button('計測を表示', () => { debugOutput.textContent = JSON.stringify(marks, null, 2); }), debugOutput); footer.append(debug);
-const information = el('details', '', 'information'); information.id = 'information'; information.append(el('summary', '情報・プライバシー'), el('p', '画像は端末内だけで処理します。初回は認識データ約45MBと実行環境をダウンロードします。'), footer);
+const information = el('details', '', 'information'); information.id = 'information'; information.append(el('summary', '情報・プライバシー'), el('p', '画像は端末内だけで処理します。初回は認識データ約17MBと実行環境をダウンロードします。'), footer);
 header.append(button('情報・設定', () => showDrawer('settings')));
 const actionPanel = el('section', '', 'action-panel'); actionPanel.append(scanActions);
 const tentativePanel = el('aside', '', 'tentative'); tentativePanel.hidden=true; tentativePanel.setAttribute('aria-label','もしかして？');
-const tentativeEnglish=el('p','','small');const tentativeExpansion=el('p','','small');const tentativePrice=el('div','','candidate-price');const tentativeFormats=new FormatLegality('candidate-format-disclosure');const tentativeReference=new ReferenceImage();
-const tentativeName=el('strong'); const tentativeScore=el('span','','small');
-const tentativeMessage=el('p','','small'); const announcement=el('span','','sr-only'); announcement.setAttribute('role','status');
+const tentativeExpansion=el('p','','small expansion');const tentativeMeta=el('p','','meta');const tentativePrice=el('div','','candidate-price');const tentativeReference=new ReferenceImage();
+const tentativeName=el('strong'); const tentativeScore=el('span','','score small');
+const tentativeMessage=el('p','','candidate-message'); const announcement=el('span','','sr-only'); announcement.setAttribute('role','status');
+const tentativeLink=el('a','','hare2-link'); tentativeLink.target='_blank'; tentativeLink.rel='noopener noreferrer';
 const confirm=button('これです',()=>confirmSuggestion()); const dismiss=button('違う',()=>dismissSuggestion());
-const tentativeContent=el('div'); tentativeContent.append(el('span','もしかして？','eyebrow'),tentativeName,tentativeEnglish,tentativeExpansion,tentativeScore,tentativeMessage);
+const tentativeContent=el('div'); tentativeContent.append(el('span','もしかして？','eyebrow'),tentativeName,tentativeExpansion,tentativeMeta,tentativeMessage);
 const tentativeActions=el('div','','actions'); tentativeActions.append(confirm,dismiss); const tentativeSummary=el('div','','candidate-summary'); tentativeSummary.append(tentativeReference.node,tentativeContent);
 const tentativeDetails=el('div','','candidate-details'); tentativeDetails.id='candidate-details';tentativeDetails.setAttribute('aria-label','候補の詳細');tentativeDetails.setAttribute('role','region');tentativeDetails.tabIndex=0;
-const tentativeRules=el('div','','candidate-rules');const tentativeSources=el('div','','candidate-sources');
-tentativeSummary.append(tentativePrice); tentativeDetails.append(tentativeExpansion,tentativeMessage,tentativeFormats.node,tentativeSources,tentativeRules);
+const tentativeSources=el('div','','candidate-sources');
+tentativeSummary.append(tentativePrice); tentativeDetails.append(tentativeSources,tentativeLink);
 tentativePanel.append(tentativeSummary,tentativeActions,tentativeDetails,announcement);
-const diagnostics=el('p','類似度 — · margin —','small'); cameraInfo.append(diagnostics);
+const diagnostics=el('p','類似度 — · margin —','small'); const resolveStatus=el('p','','small muted'); resolveStatus.setAttribute('role','status'); cameraInfo.append(diagnostics,resolveStatus);
 const settingsPanel=el('details','','recognition-settings'); settingsPanel.append(el('summary','認識設定（デバッグ）'),el('p','このタブのみ。再読み込みで初期値に戻ります。類似度は未較正の cosine 値で、確率ではありません。','small'));
 let settings: RecognitionSettings={...defaults}; let evidenceRevision=0;
 const settingsInputs=new Map<keyof RecognitionSettings,HTMLInputElement>();
@@ -86,11 +87,9 @@ for(const key of Object.keys(defaults) as (keyof RecognitionSettings)[]) {
 }
 settingsPanel.append(button('認識設定を初期値に戻す',()=>applySettings({...defaults})),settingsError);
 const history = new ScanHistory();
-let currentHistoryGeneration: number | null = null;
 const historyView = new ScanHistoryView(entry => {
   stopCamera('履歴を表示中 · カメラは停止しています');
-  currentHistoryGeneration = entry.generation;
-  void openCard(entry.card, 'スキャン履歴から選択', true, entry.finish);
+  openCard(entry.card, 'スキャン履歴から選択', true);
 }, history.limit);
 // The camera and dock are the two visual-viewport rows. Auxiliary routes are
 // modal overlay windows; the ordinary candidate dock stays nonmodal.
@@ -106,9 +105,9 @@ const drawerHeading=el('h2'); drawerHeading.id='drawer-heading';drawer.setAttrib
 const drawerBar=el('div','','drawer-bar');const drawerClose=button('補助画面を閉じる',()=>closeDrawer());drawerBar.append(drawerHeading,drawerClose);
 const drawerBody=el('div','','drawer-body');const historyRoute=el('div');historyRoute.append(el('p','確定したスキャンはまだありません。','empty-history'),historyView.node);
 const settingsRoute=el('div');settingsRoute.append(settingsPanel,information);
-searchPanel.append(fileLabel,modelRetry);
-const routes={search:searchPanel,history:historyRoute,settings:settingsRoute,result};
-const routeNames={search:'名前検索',history:'履歴',settings:'設定',result:'確定カード'};
+imagePanel.append(fileLabel,modelRetry);
+const routes={image:imagePanel,history:historyRoute,settings:settingsRoute,result};
+const routeNames={image:'画像',history:'履歴',settings:'設定',result:'確定カード'};
 let drawerTrigger:HTMLElement|null=null;
 for(const route of Object.keys(routes) as (keyof typeof routes)[]) {
  const control=button(routeNames[route],()=>showDrawer(route));control.setAttribute('aria-controls','utility-drawer');control.setAttribute('aria-expanded','false');control.dataset.route=route;navigation.append(control);
@@ -158,21 +157,22 @@ drawer.addEventListener('keydown',event=>{
 function fitViewport():void {const visual=window.visualViewport;const height=visual?.height??window.innerHeight;app.classList.toggle('compact-viewport',height<=550);app.classList.toggle('short-viewport',height<=400);app.style.height=`${visual?.height??window.innerHeight}px`;app.style.top=`${visual?.offsetTop??0}px`;app.style.left=`${visual?.offsetLeft??0}px`;app.style.width=`${visual?.width??window.innerWidth}px`;drawer.style.setProperty('--window-height',`${height}px`);drawer.style.setProperty('--window-width',`${visual?.width??window.innerWidth}px`);drawer.style.setProperty('--window-top',`${visual?.offsetTop??0}px`);drawer.style.setProperty('--window-left',`${visual?.offsetLeft??0}px`);if(drawer.open)requestAnimationFrame(revealDrawerFocus);}
 fitViewport();window.addEventListener('resize',fitViewport);window.visualViewport?.addEventListener('resize',fitViewport);window.visualViewport?.addEventListener('scroll',fitViewport);
 
+
 let stream: MediaStream | null = null; let scanGeneration = 0; let active = false; let modelReady = false;
 let preparationGeneration = 0;
 let frameBusy = false; let loopTimer: ReturnType<typeof setTimeout> | null = null;
-let detailGeneration = 0; let detailRequest: AbortController | null = null;
-let printingCards: Card[] = []; let jp: Card | null = null; let printStatus = ''; let source = '';
-let searchGeneration = 0; let searchRequest: AbortController | null = null; let nextPage: string | null = null;
 const tentative = new LiveCandidate();
-// Separate request queues keep a slow confirmed printing list from blocking the
-// next proposal. Repository instances still share the provider rate scheduler.
-const candidateRepo = new Repository();
-const snapshots = new CandidateMetadata((id:string,signal:AbortSignal)=>candidateRepo.card(id,signal));
-const japaneseSnapshots=new CandidateMetadata((oracle:string,signal:AbortSignal)=>candidateRepo.printings(oracle,signal));
-const candidateFx=new CandidateMetadata((_key:string,signal:AbortSignal)=>fx.latest(signal));
-const candidateSession=new ResultSession((id)=>snapshots.get(id),()=>candidateFx.get('USDJPY'),renderCandidatePrice);
-let suggestion: Suggestion | null=null; let suggestionCard: Card | null=null;
+// Different TCGplayer products (e.g. Poke Ball Pattern) can be the same Japanese card.
+const identity = new CardIdentity();
+const rearm = new RearmTracker(settings.rearmCount, settings.rearmMs);
+// Canonical ids the user already answered; cleared when the card leaves the view.
+const handled = new Set<string>();
+// Catalog metadata per observed id; the lookup runs once per candidate and is cached by CandidateMetadata.
+const metaById = new Map<string, { set: unknown; collector_number: unknown }>();
+const cardInfo = new CandidateMetadata<PokeCard | null>((id: string, signal: AbortSignal) => resolveCard(id, metaById.get(id) ?? {}, signal));
+const quoteFor = (id: string, signal: AbortSignal) => prices.quote(id, undefined, signal);
+const candidatePrice = new PriceSession(quoteFor, signal => fx.latest(signal), renderCandidatePrice);
+let suggestion: Suggestion | null=null; let suggestionCard: PokeCard | null=null;
 let lastAnnouncement=-Infinity;
 type ActivationGesture = { snapshot: Suggestion | null; key: string | null };
 const gestures = new Map<HTMLButtonElement, ActivationGesture>();
@@ -209,82 +209,114 @@ for(const control of [confirm,dismiss]) {
  // Release can occur after focus left the button. Never reuse that canceled gesture.
  document.addEventListener('keyup',event=>{if(gestures.get(control)?.key===event.key)gestures.delete(control);});
 }
-function hideSuggestion():void {snapshots.cancelExcept(null);japaneseSnapshots.cancelExcept(null);suggestion=null;suggestionCard=null;candidateSession.reset();tentativeReference.clear();tentativeReference.node.remove();tentativeFormats.clear();tentativeFormats.node.remove();tentativePrice.classList.remove("price-box");tentativePanel.hidden=true;emptyCandidate.hidden=false;}
+function hideSuggestion():void {cardInfo.cancelExcept(null);suggestion=null;suggestionCard=null;candidatePrice.reset();tentativeReference.clear();tentativePanel.classList.remove('holding');tentativePanel.hidden=true;emptyCandidate.hidden=false;}
 function applySettings(next: RecognitionSettings):void {
  settings={...next};evidenceRevision++;
- tentative.reset(settings.tentativeScore,settings.rearmCount,settings.rearmMs);hideSuggestion();overlay.clear();overlay.staleMs=settings.overlayMs;
+ tentative.reset(settings.tentativeScore,settings.rearmCount,settings.rearmMs);rearm.configure(settings.rearmCount,settings.rearmMs);hideSuggestion();overlay.clear();overlay.staleMs=settings.overlayMs;
  for(const [key,input] of settingsInputs)input.value=String(settings[key]);settingsError.textContent='設定を適用しました。新しい観測から使用します。';diagnostics.textContent='類似度 — · margin —';
+}
+function rememberMeta(candidate: RecognitionResult, raw: string | null):void {
+ if(!raw)return;
+ metaById.set(raw,{set:candidate.catalogMeta?.set,collector_number:candidate.catalogMeta?.collectorNumber});
+ while(metaById.size>50)metaById.delete(metaById.keys().next().value!);
+}
+// Maps the observed product id to the displayed card's identity before the live-candidate gate sees it.
+function observe(candidate: RecognitionResult, now: number): Suggestion | null {
+ const raw=candidate.cardId;
+ if(candidate.cardPresent===false){if(rearm.observe(false,now))handled.clear();}else rearm.observe(true,now);
+ if(!raw)return tentative.observe({...candidate},now);
+ const canonical=identity.canonical(raw);
+ rememberMeta(candidate,raw); if(!metaById.has(canonical))rememberMeta(candidate,canonical);
+ return tentative.observe({...candidate,cardId:canonical},now);
+}
+function showLoading():void {
+ tentativeReference.clear();tentativeName.textContent='カード情報を確認中…';tentativeExpansion.textContent='';tentativeMeta.replaceChildren(tentativeScore);tentativeMessage.textContent='';tentativeLink.hidden=true;tentativeSources.replaceChildren();tentativePrice.replaceChildren();
+}
+function showCard(card: PokeCard):void {
+ const view=candidateView(card);suggestionCard=card;tentativePanel.classList.remove('holding');
+ tentativeName.textContent=view.name;tentativeExpansion.textContent=view.expansion;
+ tentativeMeta.replaceChildren(...metaNodes(view),tentativeScore);
+ tentativeMessage.textContent='';
+ tentativeReference.update(card);tentativeLink.textContent=view.hare2.label;tentativeLink.href=view.hare2.href;tentativeLink.hidden=false;
+ tentativeSummary.prepend(tentativeReference.node);
+ void candidatePrice.select(card);
+}
+function metaNodes(view: ReturnType<typeof candidateView>):HTMLElement[] {
+ const nodes:HTMLElement[]=[];
+ if(view.rarity)nodes.push(el('span',`レアリティ ${view.rarity}`,'rarity'));
+ if(view.regulation){const badge=el('span',view.regulation.label,'regulation-badge');badge.setAttribute('aria-label',view.regulation.aria);badge.title=view.regulation.aria;nodes.push(badge);}
+ if(view.matchNote)nodes.push(el('span',view.matchNote,'match-note muted'));
+ return nodes;
 }
 function presentSuggestion(next: Suggestion | null):void {
  if(!next){hideSuggestion();return;}
  const changed=suggestion?.version!==next.version;suggestion=next;tentativeScore.textContent=`類似度 ${next.score.toFixed(3)}`;
  if(!changed)return;
- snapshots.cancelExcept(next.cardId);japaneseSnapshots.cancelExcept(null);candidateSession.reset();tentativeReference.clear();tentativeFormats.clear();tentativeEnglish.textContent='';tentativeExpansion.textContent='';tentativeName.textContent='';suggestionCard=null;tentativeSummary.prepend(tentativeReference.node);tentativeDetails.insertBefore(tentativeFormats.node,tentativeSources);tentativeRules.replaceChildren();tentativePrice.classList.add("price-box");tentativePanel.hidden=false;emptyCandidate.hidden=true;tentativeName.textContent=next.cardId;tentativeMessage.textContent='カード情報を確認中…';if(performance.now()-lastAnnouncement>=2000){announcement.textContent='もしかして？ 候補を確認できます';lastAnnouncement=performance.now();}
- void snapshots.get(next.cardId).then(card=>{
-  if(!suggestion || !tentative.current(next))return;
-  suggestionCard=card;tentativeName.textContent=card.lang==='ja'&&card.printed_name ? `日本語：${card.printed_name}` : '日本語：確認中…';
-  tentativeEnglish.textContent=`英語：${card.name}`;const finish=card.finishes.includes('nonfoil')?'nonfoil':card.finishes[0]??'nonfoil';
-  tentativeExpansion.textContent=`${card.set_name} (${card.set.toUpperCase()}) #${card.collector_number} · ${card.lang} · ${finish}`;
-  tentativeMessage.textContent='実物の版・言語・加工は未確認';tentativeReference.update(card);tentativeFormats.update(card.id,card.legalities);renderCandidateRules(card,card.lang==='ja'?card:null);
-  void candidateSession.select(card,finish);
-  if(card.lang==='ja') {if(!card.printed_name)tentativeName.textContent='日本語名は利用できません';return;}
-  void japaneseSnapshots.get(card.oracle_id).then(cards=>{
-   if(!suggestion||!tentative.current(next))return;
-   const verified=cards.filter(c=>c.oracle_id===card.oracle_id&&c.lang==='ja'&&c.printed_name);
-   const japanese=verified.find(c=>c.set===card.set&&c.collector_number===card.collector_number)??verified[0];
-   tentativeName.textContent=japanese ? `日本語：${japanese.printed_name}` : '日本語名は利用できません';renderCandidateRules(card,japanese??null);
-  }).catch(()=>{if(suggestion&&tentative.current(next))tentativeName.textContent='日本語名は利用できません';});
- }).catch(()=>{if(suggestion&&tentative.current(next)){tentativeMessage.textContent='カード情報を取得できません。確認できないため確定できません。名前検索を利用してください。';}});
+ cardInfo.cancelExcept(next.cardId);resolveStatus.textContent='';
+ // Same displayed card under another product id: adopt silently, no flicker and no new proposal.
+ if(suggestionCard&&identity.sameCard(suggestionCard.tcgplayerId,next.cardId))return;
+ if(!suggestionCard){candidatePrice.reset();showLoading();}
+ else tentativePanel.classList.add('holding'); // keep the old card visible until the replacement resolves
+ tentativePanel.hidden=false;emptyCandidate.hidden=true;if(performance.now()-lastAnnouncement>=2000){announcement.textContent='もしかして？ 候補を確認できます';lastAnnouncement=performance.now();}
+ const settle=(note:string)=>{const canonical=identity.canonical(next.cardId);tentative.dismiss({...next,identity:canonical});handled.add(canonical);hideSuggestion();resolveStatus.textContent=note;};
+ void cardInfo.get(next.cardId).then(card=>{
+  if(!suggestion||!tentative.current(next))return;
+  // Never display a candidate that only has an internal id.
+  if(!card){settle('カード情報を確認できない候補は表示しません（TCGdexに未登録のカードの可能性）');return;}
+  const canonical=identity.learn(next.cardId,card.tcgdexId);
+  if(suggestionCard?.tcgdexId===card.tcgdexId){tentativePanel.classList.remove('holding');return;}
+  if(canonical!==next.cardId&&handled.has(canonical)){settle('');return;}
+  showCard(card);
+ }).catch(()=>{if(suggestion&&tentative.current(next))settle('カード情報を取得できません。通信を確認し、カードを一度外してもう一度かざしてください。');});
 }
-function renderCandidateRules(card:Card,japanese:Card|null):void {
- const nodes:HTMLElement[]=[el('h3','日本語の印刷情報')];
- if(japanese){nodes.push(el('p',`表示用：${japanese.set.toUpperCase()} #${japanese.collector_number} · ja（実物・価格対象は候補の版）`,'small muted'));for(const face of japanese.card_faces??[japanese])nodes.push(facePanel(face,true));}
- else nodes.push(el('p','日本語印刷本文は利用できません。英語Oracleを参照してください。','small muted'));
- nodes.push(el('h3','英語 Oracle（現在のルール本文）'));for(const face of card.card_faces??[card])nodes.push(facePanel(face,false));tentativeRules.replaceChildren(...nodes);
+function priceNodes(state: PriceSession['value']):{summary:HTMLElement[];disclaimer:HTMLElement;details:HTMLElement[]} {
+ const view=priceView({status:state.status,quotes:state.quotes,variant:state.card?.variant??null,fx:state.fx,fxError:state.fxError});
+ const summary:HTMLElement[]=[el('p',view.heading,'eyebrow'),el('strong',view.headline,'price')];
+ if(view.usd)summary.push(el('span',view.usd,'usd'));
+ const disclaimer=el('p',view.disclaimer,'small');
+ const details:HTMLElement[]=[];
+ if(view.note)details.push(el('p',view.note,'small'));
+ if(view.others.length)details.push(el('p',`他の価格区分：${view.others.join(' / ')}`,'small muted others'));
+ if(view.updatedAt)details.push(el('p',`TCGplayer（TCGCSV経由）· ${view.updatedAt}`,'small muted'));
+ details.push(el('p',view.fxNote,'small muted'));
+ return {summary,disclaimer,details};
 }
 function renderCandidatePrice():void {
- const value=candidateSession.value;const card=value.card;
- if(!card||card.id!==suggestion?.cardId){tentativePrice.replaceChildren();tentativeSources.replaceChildren();return;}
- const display=formatReferencePrice(value.quote,value.fx);
- const nodes:HTMLElement[]=[el('p','海外参考価格','eyebrow'),el('strong',value.loading?'価格を取得中…':value.error?'価格を取得できません':display.usd?display.jpy?`概算 ${display.jpy}`:'概算JPYは利用できません':'この版・言語・加工の価格なし','price')];
- if(display.usd&&!value.loading&&!value.error)nodes.push(el('span',`${display.usd} USD`,'usd'));
- nodes.push(el('p','国内販売・買取価格ではありません','small'));
- if(value.retrievedAt)nodes.push(el('p',`Scryfall · 応答確認 ${new Date(value.retrievedAt).toLocaleString('ja-JP')} · 価格更新時刻は未取得（24時間キャッシュ）`,'small muted'));
- nodes.push(el('p',value.fx?`Frankfurter / ECB · 1 USD = ${value.fx.jpyPerUsd} JPY · 最新公表日 ${value.fx.asOf}`:value.fxError?'為替を取得できません。USDのみ表示します。':'為替を確認中（取得できなければUSDのみ）','small muted'));
- tentativePrice.replaceChildren(...nodes.filter((node,index)=>index<2||node.classList.contains('usd')));tentativeSources.replaceChildren(...nodes.filter((node,index)=>index>=2&&!node.classList.contains('usd')));
+ const value=candidatePrice.value;
+ if(!value.card||value.card.tcgdexId!==suggestionCard?.tcgdexId){tentativePrice.replaceChildren();tentativeSources.replaceChildren();return;}
+ const {summary,disclaimer,details}=priceNodes(value);tentativePrice.replaceChildren(...summary);tentativeSources.replaceChildren(disclaimer,...details);
 }
-function dismissSuggestion():void {const captured=activationSnapshot(dismiss);if(captured){tentative.dismiss(captured);if(suggestion?.version===captured.version)hideSuggestion();}}
+function dismissSuggestion():void {const captured=activationSnapshot(dismiss);if(captured){handled.add(identity.canonical(captured.cardId));tentative.dismiss(captured);if(suggestion?.version===captured.version)hideSuggestion();}}
 function confirmSuggestion():void {
  const captured=activationSnapshot(confirm);
  if(!captured || !tentative.current(captured) || suggestion?.version!==captured.version)return;
- const card=suggestionCard;if(!card || card.id!==captured.cardId){tentativeMessage.textContent='カード情報を確認できません。取得完了後に再確認してください。';return;}
- evidenceRevision++;tentative.accepted(captured.identity);hideSuggestion();
- const event=++acceptedEvent;const finish=card.finishes.includes('nonfoil')?'nonfoil':card.finishes[0]??'nonfoil';
- history.accept(event,card,finish);currentHistoryGeneration=event;historyView.update(history.allEntries);
- void openCard(card,'「これです」で確認 · 実物の版・言語・加工は未確認',false,finish,active);
+ const card=suggestionCard;if(!card || !identity.sameCard(card.tcgplayerId,captured.cardId)){tentativeMessage.textContent='カード情報を確認できません。取得完了後に再確認してください。';return;}
+ evidenceRevision++;tentative.accepted(captured.identity);handled.add(identity.canonical(captured.cardId));hideSuggestion();
+ const event=++acceptedEvent;
+ history.accept(event,card);historyView.update(history.allEntries);
+ openCard(card,'「これです」で確認 · 実物のカード（版・状態）は未確認',false,active);
 }
 let acceptedEvent = 0;
 const recognizer = new Recognizer(message => { modelStatus.textContent = message; });
 const referenceImage = new ReferenceImage();
-const formatLegality = new FormatLegality();
-const session = new ResultSession((id, signal) => repo.card(id, signal), signal => fx.latest(signal), renderResult);
+const session = new PriceSession(quoteFor, signal => fx.latest(signal), renderResult);
 
 async function prepare(): Promise<boolean> {
   const attempt = ++preparationGeneration;
   modelRetry.hidden = true; mark('model-start');
   try { await recognizer.init(); if (attempt !== preparationGeneration) return false; modelReady = true; mark('model-ready'); return true; }
-  catch (error) { if (attempt !== preparationGeneration) return false; modelReady = false; modelStatus.textContent = errorText(error, '認識データを準備できません。名前検索は利用できます。'); modelRetry.hidden = false; mark('model-error'); return false; }
+  catch (error) { if (attempt !== preparationGeneration) return false; modelReady = false; modelStatus.textContent = errorText(error, '認識データを準備できません。端末の画像で再試行できます。'); modelRetry.hidden = false; mark('model-error'); return false; }
 }
 function errorText(error: unknown, fallback: string): string {
   if (!navigator.onLine) return 'オフラインです。接続後に再試行してください。';
-  if (error instanceof DOMException && error.name === 'NotAllowedError') return 'カメラの許可がありません。ブラウザの設定で許可し、再試行してください。名前検索・端末の画像も使えます。';
-  if (error instanceof DOMException && error.name === 'NotFoundError') return 'カメラが見つかりません。端末の画像または名前検索を利用してください。';
+  if (error instanceof DOMException && error.name === 'NotAllowedError') return 'カメラの許可がありません。ブラウザの設定で許可し、再試行してください。端末の画像も使えます。';
+  if (error instanceof DOMException && error.name === 'NotFoundError') return 'カメラが見つかりません。端末の画像を利用してください。';
   if (error instanceof DOMException && error.name === 'NotReadableError') return 'カメラを使用できません。他のアプリを閉じて再試行してください。';
   if (error instanceof Error && error.name !== 'AbortError') return `${fallback} ${error.message}`;
   return fallback;
 }
 function stopCamera(message?: string): void {
-  scanGeneration++; evidenceRevision++; hideSuggestion(); tentative.newContext();for(const gesture of gestures.values())gesture.snapshot=null; active = false;  overlay.stop(); overlayCanvas.dataset.detected = 'false'; detectionStatus.textContent = 'カード検出なし';
+  scanGeneration++; evidenceRevision++; hideSuggestion(); tentative.newContext();handled.clear();resolveStatus.textContent='';for(const gesture of gestures.values())gesture.snapshot=null; active = false;  overlay.stop(); overlayCanvas.dataset.detected = 'false'; detectionStatus.textContent = 'カード検出なし';
   if (loopTimer) clearTimeout(loopTimer); loopTimer = null;
   stream?.getTracks().forEach(track => track.stop()); stream = null; video.srcObject = null;
   start.disabled = false; stop.disabled = true; guide.hidden = true;
@@ -293,8 +325,6 @@ function stopCamera(message?: string): void {
 }
 async function startCamera(): Promise<void> {
   closeDrawer();
-  currentHistoryGeneration = null;
-  detailGeneration++; detailRequest?.abort(); session.reset();
   stopCamera(); const generation = scanGeneration; active = true; start.disabled = true; stop.disabled = false;
   cameraStatus.textContent = 'カメラの許可・起動を待っています'; mark('camera-start');
   const ready = prepare();
@@ -332,9 +362,9 @@ async function loop(generation: number): Promise<void> {
     diagnostics.textContent=`類似度 ${Number.isFinite(candidate.score) ? candidate.score!.toFixed(3) : '—'} · margin ${Number.isFinite(candidate.margin) ? candidate.margin.toFixed(3) : '—'}`;
     overlay.update(candidate, capturedAt);
     cameraStatus.textContent = 'カード全体を画面内へ · 候補は「これです」で確認してください';
-    presentSuggestion(tentative.observe({...candidate,oracleId:candidate.scryfallOracleId},performance.now()));
+    presentSuggestion(observe(candidate,performance.now()));
   } catch (error) {
-    if (generation === scanGeneration) { modelReady = false; modelRetry.hidden = false; stopCamera(errorText(error, '認識できません。名前検索も利用できます。')); }
+    if (generation === scanGeneration) { modelReady = false; modelRetry.hidden = false; stopCamera(errorText(error, '認識できません。端末の画像も利用できます。')); }
   } finally {
     frameBusy = false;
     if (active && generation === scanGeneration) loopTimer = setTimeout(() => { void loop(generation); }, settings.delayMs);
@@ -343,8 +373,7 @@ async function loop(generation: number): Promise<void> {
 file.addEventListener('change', () => { const image = file.files?.[0]; file.value = ''; if (image) void scanFile(image); });
 async function scanFile(image: File): Promise<void> {
   closeDrawer();
-  currentHistoryGeneration = null;
-  detailGeneration++; detailRequest?.abort(); session.reset();
+  session.reset();
   // A local image starts a new recognition session; never compete with a
   // transferred camera frame that cannot be recalled from the old worker.
   recognizer.dispose(); modelReady = false;
@@ -360,133 +389,48 @@ async function scanFile(image: File): Promise<void> {
     const revision=evidenceRevision; mark('file-frame-start'); const candidate = await recognizer.frame(await createImageBitmap(canvas)); mark('file-frame-result', candidate);
     if (generation !== scanGeneration || revision!==evidenceRevision) return;
     diagnostics.textContent=`類似度 ${Number.isFinite(candidate.score)?candidate.score!.toFixed(3):'—'} · margin ${Number.isFinite(candidate.margin)?candidate.margin.toFixed(3):'—'}`;
-    presentSuggestion(tentative.observe({...candidate,oracleId:candidate.scryfallOracleId},performance.now()));
-    cameraStatus.textContent = suggestion ? '画像の候補を「これです」で確認してください' : '候補を絞れませんでした。四隅・背景・反射を確認するか、名前検索で探してください。';
+    presentSuggestion(observe(candidate,performance.now()));
+    cameraStatus.textContent = suggestion ? '画像の候補を「これです」で確認してください' : '候補を絞れませんでした。四隅・背景・反射を確認してもう一度お試しください。';
   } catch (error) { if (generation === scanGeneration) cameraStatus.textContent = errorText(error, '画像を認識できません。'); }
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) stopCamera('背景に移動したため停止しました。カメラでスキャンから再開できます。'); });
 window.addEventListener('pagehide', () => { stopCamera(); recognizer.dispose(); modelReady = false; });
-window.addEventListener('offline', () => { searchStatus.textContent = 'オフラインです。接続後に検索を再試行してください。'; });
 stop.disabled = true;
 
-searchForm.addEventListener('submit', event => { event.preventDefault(); void search(); });
-async function search(): Promise<void> {
-  const term = query.value.trim(); if (!term) return;
-  currentHistoryGeneration = null;
-  detailGeneration++; detailRequest?.abort(); session.reset();
-  stopCamera('名前検索中 · カメラは停止しています');
-  searchRequest?.abort(); const request = new AbortController(); searchRequest = request; const generation = ++searchGeneration;
-  nextPage = null; more.hidden = true; searchResults.replaceChildren(); searchStatus.textContent = 'Scryfallを検索中…'; submit.disabled = true;
-  try {
-    const page = await repo.search(term, request.signal);
-    if (generation !== searchGeneration) return;
-    appendSearch(page.cards); nextPage = page.next; more.hidden = !nextPage; searchStatus.textContent = `${page.cards.length}件 · カードを選択してください`;
-  } catch (error) { if (generation === searchGeneration) searchStatus.textContent = errorText(error, '見つかりません。名前を確認して再検索してください。'); }
-  finally { if (generation === searchGeneration) submit.disabled = false; }
-}
-async function searchMore(): Promise<void> {
-  if (!nextPage || !searchRequest) return; const generation = searchGeneration; more.disabled = true;
-  try { const page = await repo.page(nextPage, searchRequest.signal); if (generation !== searchGeneration) return; appendSearch(page.cards); nextPage = page.next; more.hidden = !nextPage; }
-  catch (error) { if (generation === searchGeneration) searchStatus.textContent = errorText(error, '続きの取得に失敗しました。再試行してください。'); }
-  finally { more.disabled = false; }
-}
-function appendSearch(cards: Card[]): void {
-  for (const c of cards) {
-    const b = button(`${c.printed_name ?? c.name}　${c.set.toUpperCase()} #${c.collector_number} · ${c.lang}`, () => { currentHistoryGeneration = null; void openCard(c, '手動検索で選択'); });
-    searchResults.append(b);
-  }
-}
-async function openCard(c: Card, origin: string, reveal = true, selectedFinish?: string, live = false): Promise<void> {
-  if (!live) stopCamera('カメラは停止中 · カード情報を表示しています'); detailRequest?.abort(); const request = new AbortController(); detailRequest = request; const generation = ++detailGeneration;
-  printingCards = [c]; jp = c.lang === 'ja' ? c : null; printStatus = '版・言語の一覧を全ページ取得中…'; source = origin;
-  void session.select(c, selectedFinish ?? (c.finishes.includes('nonfoil') ? 'nonfoil' : c.finishes[0] ?? 'nonfoil'));
+function openCard(card: PokeCard, origin: string, reveal = true, live = false): void {
+  if (!live) stopCamera('カメラは停止中 · カード情報を表示しています');
+  source = origin; void session.select(card);
   result.hidden = false; renderResult();
   if (reveal) showDrawer('result');
-  try {
-    const cards = await repo.printings(c.oracle_id, request.signal);
-    if (generation !== detailGeneration) return;
-    printingCards = cards.some(x => x.id === c.id) ? cards : [c, ...cards];
-    jp = printingCards.find(x => x.lang === 'ja' && x.set === c.set && x.collector_number === c.collector_number) ?? printingCards.find(x => x.lang === 'ja') ?? null;
-    printStatus = `${printingCards.length}版・言語（全ページ）`; renderResult();
-  } catch (error) { if (generation === detailGeneration) { printStatus = errorText(error, '版一覧を取得できません。'); renderResult(); } }
 }
-function options(select: HTMLSelectElement, entries: [string, string][], selected: string): void {
-  for (const [value, name] of entries) { const option = el('option', name); option.value = value; option.selected = value === selected; select.append(option); }
-}
-function choose(c: Card, finish = session.value.finish): void {
-  const available = c.finishes.includes(finish) ? finish : c.finishes[0] ?? 'nonfoil';
-  source = '手動指定 · 認識結果で変更されません';
-  if (currentHistoryGeneration !== null) { history.update(currentHistoryGeneration, c, available); historyView.update(history.allEntries); }
-  void session.select(c, available);
-}
+let source = '';
 function renderResult(): void {
-  const value = session.value; const c = value.card; if (!c) { referenceImage.clear(); formatLegality.clear(); result.hidden = true; result.replaceChildren(); return; }
+  const value = session.value; const c = value.card; if (!c) { referenceImage.clear(); result.hidden = true; result.replaceChildren(); return; }
   result.hidden = false; const scrollPosition = drawerBody.scrollTop; const nodes: HTMLElement[] = [];
   const focused = result.contains(document.activeElement) ? document.activeElement as HTMLElement : null;
-  const focusLabel = focused?.getAttribute('aria-label');
   const focusText = focused && ['BUTTON', 'SUMMARY'].includes(focused.tagName) ? focused.textContent : null;
-  const heading = el('div', '', 'result-heading'); const identity = el('div', '', 'identity');
-  identity.append(el('h2', jp?.printed_name ?? c.printed_name ?? c.name), el('p', c.name, 'muted'), el('p', `${c.set.toUpperCase()} #${c.collector_number} · ${c.lang}`, 'small muted'), el('p', source, 'eyebrow'), button('スキャンに戻る', () => {
+  const view = candidateView(c);
+  const heading = el('div', '', 'result-heading'); const identityBox = el('div', '', 'identity');
+  const meta = el('p', '', 'small meta'); meta.append(...metaNodes(view));
+  identityBox.append(el('h2', view.name), el('p', view.expansion, 'small muted'), meta, el('p', source, 'eyebrow'), button('スキャンに戻る', () => {
     closeDrawer(); start.focus({ preventScroll: true });
   }));
-  referenceImage.update(c); heading.append(referenceImage.node, identity); nodes.push(heading);
-  formatLegality.update(c.id, c.legalities); nodes.push(formatLegality.node);
-  const controls = el('div', '', 'controls');
-  const language = el('select'); language.setAttribute('aria-label', '選択版の言語');
-  options(language, [...new Set(printingCards.map(x => x.lang))].map(l => [l, l === 'ja' ? '日本語 (ja)' : l === 'en' ? '英語 (en)' : l]), c.lang);
-  language.onchange = () => {
-    const match = printingCards.find(x => x.lang === language.value && x.set === c.set && x.collector_number === c.collector_number);
-    const fallback = printingCards.find(x => x.lang === language.value);
-    if (match ?? fallback) {
-      choose((match ?? fallback)!);
-      if (!match) { source = '手動指定 · 同じ版の指定言語がないため別版を選択しました。版を確認してください。'; renderResult(); }
-    }
-  };
-  const printing = el('select'); printing.setAttribute('aria-label', '印刷版');
-  options(printing, printingCards.filter(x => x.lang === c.lang).map(x => [x.id, `${x.set_name} (${x.set.toUpperCase()}) #${x.collector_number}`]), c.id);
-  printing.onchange = () => { const chosen = printingCards.find(x => x.id === printing.value); if (chosen) choose(chosen); };
-  const finish = el('select'); finish.setAttribute('aria-label', '加工'); const finishNames: Record<string, string> = { nonfoil: '通常 (Nonfoil)', foil: 'Foil', etched: 'Etched' };
-  options(finish, c.finishes.map(f => [f, finishNames[f] ?? f]), value.finish); finish.onchange = () => choose(c, finish.value);
-  controls.append(label('実物の言語', language), label('印刷版', printing), label('実物の加工', finish));
-  nodes.push(controls, el('p', printStatus, 'small muted'));
-  if (printStatus.includes('取得できません') || printStatus.includes('失敗')) nodes.push(button('版一覧を再取得', () => { void openCard(c, source, false, value.finish, active); }));
-  nodes.push(el('p', `価格の参照対象：${c.set.toUpperCase()} #${c.collector_number} · ${c.lang} · ${finishNames[value.finish] ?? value.finish}`, 'target'));
+  referenceImage.update(c); heading.append(referenceImage.node, identityBox); nodes.push(heading);
   const priceBox = el('div', '', 'price-box');
   // Late FX can remove a wrapped status line. Retain the measured price region
   // so even a reader at document bottom keeps their exact position.
   const previousPriceHeight = result.querySelector('.price-box')?.getBoundingClientRect().height;
   if (previousPriceHeight) priceBox.style.minHeight = `${previousPriceHeight}px`;
-  const display = formatReferencePrice(value.quote, value.fx);
-  priceBox.append(el('p', '海外参考価格', 'eyebrow'));
-  priceBox.append(el('strong', value.loading ? '価格を取得中…' : value.error ? '価格を取得できません' : display.usd ? display.jpy ? `概算 ${display.jpy}` : '概算JPYは利用できません' : 'この版・言語・加工の価格なし', display.jpy ? 'price yen' : 'price'));
-  if (display.usd && !value.loading && !value.error) priceBox.append(el('span', `${display.usd} USD`, 'usd'));
-  priceBox.append(el('p', '国内販売・買取価格ではありません', 'small'));
-  const priceDetails = el('details', '', 'price-details'); priceDetails.open = result.querySelector<HTMLDetailsElement>('.price-details')?.open ?? false; priceDetails.append(el('summary', '価格・為替の出典と日時'));
-  if (value.retrievedAt) priceDetails.append(el('p', `Scryfall · 応答確認 ${new Date(value.retrievedAt).toLocaleString('ja-JP')} · 提供元の価格更新時刻は未取得（24時間キャッシュ）`, 'small muted'));
-  if (value.fx) priceDetails.append(el('p', `Frankfurter / ECB · 1 USD = ${value.fx.jpyPerUsd} JPY · 最新公表日 ${value.fx.asOf}`, 'small muted'));
-  else priceBox.append(el('p', value.fxError ? '為替を取得できません。USDのみ表示します。' : '為替の確認中（取得できなければUSDのみ）', 'small muted'));
-  priceBox.append(priceDetails, button('価格・為替を再確認', () => { void session.select(c, value.finish); }));
-  if (value.error) priceBox.append(el('p', value.error, 'error'));
-  nodes.splice(2, 0, priceBox);
-  nodes.splice(3, 0, button('次のカードをスキャン', () => { void startCamera(); }, 'primary'));
-  const rules = el('details', '', 'card-rules'); rules.open = result.querySelector<HTMLDetailsElement>('.card-rules')?.open ?? false; rules.append(el('summary', 'カード本文・ルール'));
-  const japanese = c.lang === 'ja' ? c : jp;
-  rules.append(el('h3', '日本語の印刷情報'), el('p', japanese ? `表示用の日本語情報：${japanese.set.toUpperCase()} #${japanese.collector_number} · ja（価格対象は上の選択版）` : '日本語情報なし。英語Oracleを参照してください。', 'small muted'));
-  if (japanese) for (const face of japanese.card_faces ?? [japanese]) rules.append(facePanel(face, true));
-  rules.append(el('h3', '英語 Oracle（現在のルール本文）'));
-  for (const face of c.card_faces ?? [c]) rules.append(facePanel(face, false));
-  nodes.push(rules);
+  const {summary, disclaimer, details} = priceNodes(value);
+  priceBox.append(...summary, disclaimer);
+  const priceDetails = el('details', '', 'price-details'); priceDetails.open = result.querySelector<HTMLDetailsElement>('.price-details')?.open ?? false; priceDetails.append(el('summary', '価格・為替の出典と日時'), ...details);
+  priceBox.append(priceDetails, button('価格・為替を再確認', () => { void session.select(c); }));
+  nodes.push(priceBox, button('次のカードをスキャン', () => { void startCamera(); }, 'primary'));
+  const link = el('a', view.hare2.label, 'hare2-link'); link.href = view.hare2.href; link.target = '_blank'; link.rel = 'noopener noreferrer';
+  nodes.push(link, el('p', '晴れる屋2は検索ページへのリンクのみです。価格や内容はこのアプリでは取得・表示しません。', 'small muted'));
   result.replaceChildren(...nodes);
-  if (focused) {
-    const replacement = [...result.querySelectorAll<HTMLElement>('select, button, summary')].find(node =>
-      focusLabel ? node.getAttribute('aria-label') === focusLabel : focusText !== null && node.tagName === focused.tagName && node.textContent === focusText);
-    replacement?.focus({ preventScroll: true });
-  }
+  if (focusText !== null) [...result.querySelectorAll<HTMLElement>('button, summary')].find(node => node.textContent === focusText)?.focus({ preventScroll: true });
   drawerBody.scrollTop=scrollPosition;
   mark('result-render');
-}
-function facePanel(face: Face, japanese: boolean): HTMLElement {
-  const box = el('article', '', 'face'); box.append(el('h4', japanese ? face.printed_name ?? face.name : face.name), el('p', `${face.mana_cost ?? ''}　${japanese ? face.printed_type_line ?? face.type_line ?? '' : face.type_line ?? ''}`, 'muted'), el('p', japanese ? face.printed_text ?? '日本語印刷本文なし' : face.oracle_text ?? 'Oracle本文なし', 'rules'));
-  return box;
 }
 mark('shell-ready');

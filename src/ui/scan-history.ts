@@ -1,5 +1,5 @@
 import { el, button } from './dom.js';
-import { referenceFaces, safeScryfallUrl } from './reference-image.js';
+import { candidateView, thumbnailUrl } from './candidate-view.js';
 import type { ScanHistoryEntry, PendingScanHistoryEntry } from './scan-history-model.js';
 import './scan-history.css';
 export class ScanHistoryView {
@@ -24,20 +24,18 @@ export class ScanHistoryView {
         const node = el('li'); const card = entry.card;
         if (!card) {
           const pending = el('div', '', 'scan-history-row');
-          pending.append(el('strong', `認識候補 · ${entry.cardId}`), el('p', entry.status, 'small muted'));
+          pending.append(el('strong', '認識候補'), el('p', entry.status, 'small muted'));
           node.append(pending); row?.node.replaceWith(node); row = {node,signature}; this.rows.set(entry.generation,row);
           if (this.list.children[index] !== node) this.list.insertBefore(node,this.list.children[index] ?? null);
           return;
         }
         const resolved = entry as ScanHistoryEntry;
-        const name = card.printed_name ?? card.name;
-        const finish = { nonfoil: '通常', foil: 'Foil', etched: 'Etched' }[resolved.finish] ?? resolved.finish;
-        const selection = `${card.set_name} (${card.set.toUpperCase()}) #${card.collector_number} · ${card.lang} · ${finish}`;
+        const view = candidateView(card);
+        const name = view.name; const selection = view.expansion;
         const control = button('', () => this.reopen(resolved), 'scan-history-row');
         control.setAttribute('aria-label', `${name} · ${selection} を開く`);
         const thumbnail = el('span', '', 'scan-history-thumbnail');
-        // Same host/protocol validation as the main reference image, full card only.
-        const url = safeScryfallUrl(card.image_uris?.small, 'image') ?? referenceFaces(card)[0]?.url;
+        const url = thumbnailUrl(card.imageUrl);
         const fallback = el('span', '画像なし', 'small'); thumbnail.append(fallback);
         if (url) {
           const image = el('img'); image.alt = ''; image.width = 48; image.height = 67;
