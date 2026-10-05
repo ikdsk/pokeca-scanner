@@ -34,8 +34,14 @@ type PokeCard = {
 resolveCard(tcgplayerId, catalogMeta, signal): Promise<PokeCard | null>
 ```
 - Match rule: derive candidate TCGdex id from `catalogMeta` (set code prefix + collector-number left part),
-  fetch `GET https://api.tcgdex.net/v2/ja/cards/{id}`, ACCEPT only if some
-  `variants_detailed[].thirdParty.tcgplayer` equals `tcgplayerId`. Otherwise return null (do not display).
+  fetch `GET https://api.tcgdex.net/v2/ja/cards/{id}`.
+  1. `matchMethod: 'tcgplayer_id'` — some `variants_detailed[].thirdParty.tcgplayer` equals `tcgplayerId`.
+  2. `matchMethod: 'set_number'` — ONLY when the TCGdex card has NO tcgplayer cross-reference at all, AND
+     set code equals `set.id` (case-insensitive), AND numeric localId equals the number's left part, AND the number's right part
+     (if present) equals `set.cardCount.official`. A card that has tcgplayer refs pointing to OTHER ids is a mismatch → null.
+  3. Otherwise null (do not display).
+  Reason (2026-10-05 coordinator probe): TCGdex has tcgplayer refs for SV4K/SV8/SV9 (8/8 sampled) but 0/8 for SV11B, M1L, M2 —
+  the newest sets most users scan. `PokeCard` gains `matchMethod`.
 - TCGdex responds with `Access-Control-Allow-Origin: *` (verified 2026-10-05).
 
 ## Price (PRICE, issue #4) — `src/data/tcgplayer-price.ts`

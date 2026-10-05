@@ -16,7 +16,8 @@
     "evidence:live": "node scripts/live-evidence.mjs",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm test"
+    "check": "npm run typecheck && npm test",
+    "prices:snapshot": "node scripts/price-snapshot.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.59.1",
