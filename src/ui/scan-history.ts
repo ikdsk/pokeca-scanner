@@ -1,5 +1,5 @@
 import { el, button } from './dom.js';
-import { candidateView, thumbnailUrl } from './candidate-view.js';
+import { candidateView, thumbnailUrls } from './candidate-view.js';
 import type { ScanHistoryEntry, PendingScanHistoryEntry } from './scan-history-model.js';
 import './scan-history.css';
 export class ScanHistoryView {
@@ -35,14 +35,15 @@ export class ScanHistoryView {
         const control = button('', () => this.reopen(resolved), 'scan-history-row');
         control.setAttribute('aria-label', `${name} · ${selection} を開く`);
         const thumbnail = el('span', '', 'scan-history-thumbnail');
-        const url = thumbnailUrl(card.imageUrl);
+        const urls = thumbnailUrls(card);
         const fallback = el('span', '画像なし', 'small'); thumbnail.append(fallback);
-        if (url) {
+        if (urls.length) {
           const image = el('img'); image.alt = ''; image.width = 48; image.height = 67;
           image.loading = 'lazy'; image.decoding = 'async'; image.referrerPolicy = 'no-referrer';
           image.onload = () => { fallback.hidden = true; };
-          image.onerror = () => { image.hidden = true; fallback.hidden = false; };
-          image.src = url; thumbnail.append(image);
+          let next = 0;
+          image.onerror = () => { if (++next < urls.length) { image.src = urls[next]!; return; } image.hidden = true; fallback.hidden = false; };
+          image.src = urls[0]!; thumbnail.append(image);
         }
         const text = el('span', '', 'scan-history-text'); text.append(el('strong', name), el('span', selection, 'small muted'));
         control.append(thumbnail, text); node.append(control);

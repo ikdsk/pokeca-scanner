@@ -1,3 +1,4 @@
+import { referenceImageSources } from './image-source.js';
 import { hare2SearchUrl, type PokeCard } from '../data/pokemon.js';
 export type CandidateView = {
   name: string;
@@ -21,12 +22,5 @@ export function candidateView(card: PokeCard): CandidateView {
     hare2: { href: hare2SearchUrl(card), label: '晴れる屋2で探す ↗' },
   };
 }
-// History rows use the small TCGdex rendition; only the validated image host is accepted.
-export function thumbnailUrl(imageUrl: string | null): string | null {
-  if (!imageUrl) return null;
-  try {
-    const url = new URL(imageUrl);
-    if (url.protocol !== 'https:' || url.hostname !== 'assets.tcgdex.net' || !url.pathname.endsWith('/high.webp')) return null;
-    return `https://assets.tcgdex.net${url.pathname.replace(/high\.webp$/, 'low.webp')}`;
-  } catch { return null; }
-}
+// History rows use the small rendition of each validated source, in fallback order.
+export const thumbnailUrls = (card: PokeCard): string[] => referenceImageSources(card).map(source => source.thumbUrl);

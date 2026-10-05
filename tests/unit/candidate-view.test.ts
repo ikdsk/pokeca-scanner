@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { candidateView, thumbnailUrl } from '../../src/ui/candidate-view.js';
+import { candidateView, thumbnailUrls } from '../../src/ui/candidate-view.js';
 import { pokeCard } from './fixtures.js';
 // SYNTHETIC fixtures only.
 it('shows the Japanese name, expansion with number, rarity, regulation badge and image (SYNTHETIC)', () => {
@@ -23,8 +23,8 @@ it('builds the 晴れる屋2 link from the card (link only) (SYNTHETIC)', () => 
   expect(url.origin).toBe('https://www.hareruya2.com');
   expect(url.searchParams.get('q')).toBe('ヤナップ 001/66 SV4K');
 });
-it('derives a small thumbnail only from validated TCGdex image URLs', () => {
-  expect(thumbnailUrl('https://assets.tcgdex.net/ja/SV/SV4K/001/high.webp')).toBe('https://assets.tcgdex.net/ja/SV/SV4K/001/low.webp');
-  expect(thumbnailUrl('https://evil.example/a/high.webp')).toBeNull();
-  expect(thumbnailUrl(null)).toBeNull();
+it('lists thumbnails in fallback order: TCGdex low, then TCGplayer 200w (SYNTHETIC)', () => {
+  expect(thumbnailUrls(pokeCard)).toEqual(['https://assets.tcgdex.net/ja/SV/SV4K/001/low.webp', 'https://tcgplayer-cdn.tcgplayer.com/product/565756_200w.jpg']);
+  expect(thumbnailUrls({ ...pokeCard, imageUrl: 'https://evil.example/a/high.webp' })).toEqual(['https://tcgplayer-cdn.tcgplayer.com/product/565756_200w.jpg']);
+  expect(thumbnailUrls({ ...pokeCard, imageUrl: null, tcgplayerId: 'x' })).toEqual([]);
 });
