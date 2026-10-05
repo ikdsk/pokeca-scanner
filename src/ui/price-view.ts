@@ -14,7 +14,7 @@ function updated(iso: string | null): string | null {
 function listed(quote: UsdQuote, fx: FxRate | null): string {
   if (quote.usdMarket === null) return `${quote.subType} 価格なし`;
   const display = formatReferencePrice(quote.usdMarket, fx);
-  return `${quote.subType} ${display.usd} USD${display.jpy ? `（概算 ${display.jpy}）` : ''}`;
+  return `${quote.subType} ${display.usd} USD${display.jpy ? `（参考価格 ${display.jpy}）` : ''}`;
 }
 export function priceView(input: PriceInput): PriceView {
   const view: PriceView = {
@@ -33,7 +33,7 @@ export function priceView(input: PriceInput): PriceView {
   if (!chosen) return { ...view, headline: '版により価格が異なります', note: 'この版に対応する価格区分を特定できないため、1つには決めず全区分を表示します。' };
   if (chosen.usdMarket === null) return { ...view, headline: 'この商品の価格なし' };
   const display = formatReferencePrice(chosen.usdMarket, input.fx);
-  view.headline = display.jpy ? `概算 ${display.jpy}` : '概算JPYは利用できません';
+  view.headline = display.jpy ? `参考価格 ${display.jpy}` : '概算JPYは利用できません';
   view.usd = display.usd ? `${display.usd} USD` : null;
   return view;
 }

@@ -11,6 +11,11 @@ export const products: Record<string, Product> = {
   '900003': { set: 'TST: Synthetic Set', number: '003/066' },
   '900021': { set: 'TST2: Synthetic Set Two', number: '161/165' },
   '900022': { set: 'TST2: Synthetic Set Two', number: '161/165' },
+  '900011': { set: 'TST: Synthetic Set', number: '001/066' }, // another product of TST-001 (pattern variant)
+  '900004': { set: 'TST: Synthetic Set', number: '004/066' },
+  '900005': { set: 'TST: Synthetic Set', number: '005/066' },
+  '900006': { set: 'TST: Synthetic Set', number: '006/066' },
+  '900007': { set: 'TST: Synthetic Set', number: '007/066' },
   '900099': { set: 'TST: Synthetic Set', number: '099/066' }, // no TCGdex card -> must stay hidden
 };
 
@@ -20,9 +25,12 @@ const dex = (id: string, localId: string, name: string, setId: string, setName: 
   image: `https://assets.tcgdex.net/ja/TST/${setId}/${localId}`, set: { id: setId, name: setName, cardCount: { official: 66 } }, ...extra,
 });
 export const tcgdexCards: Record<string, Dex> = {
-  'TST-001': dex('TST-001', '001', 'テストA', 'TST', 'テスト拡張', { variants_detailed: [{ type: 'normal', thirdParty: { tcgplayer: 900001 } }] }),
+  'TST-001': dex('TST-001', '001', 'テストA', 'TST', 'テスト拡張', { variants_detailed: [{ type: 'normal', thirdParty: { tcgplayer: 900001 } }, { type: 'pokeball', thirdParty: { tcgplayer: 900011 } }] }),
   'TST-002': dex('TST-002', '002', 'テストB', 'TST', 'テスト拡張', { rarity: 'R', regulationMark: 'H', variants_detailed: [{ type: 'normal', thirdParty: { tcgplayer: 900002 } }] }),
   'TST-003': dex('TST-003', '003', 'テストC', 'TST', 'テスト拡張', { variants_detailed: [{ type: 'normal', thirdParty: { tcgplayer: 900003 } }] }),
+  'TST-004': dex('TST-004', '004', 'テストE', 'TST', 'テスト拡張', { variants_detailed: [{ type: 'normal', thirdParty: { tcgplayer: 900004 } }] }),
+  'TST-005': dex('TST-005', '005', 'テストF', 'TST', 'テスト拡張', { variants_detailed: [{ type: 'normal', thirdParty: { tcgplayer: 900005 } }] }),
+  'TST-006': dex('TST-006', '006', 'テストG', 'TST', 'テスト拡張', { variants_detailed: [{ type: 'normal', thirdParty: { tcgplayer: 900006 } }] }),
   // No tcgplayer cross reference at all: matched by set code + number (matchMethod set_number).
   'TST2-161': dex('TST2-161', '161', 'テストD', 'TST2', 'テスト拡張2', { set: { id: 'TST2', name: 'テスト拡張2', cardCount: { official: 165 } }, variants_detailed: [{ type: 'normal' }] }),
 };
@@ -30,7 +38,7 @@ export const snapshot = {
   source: 'tcgcsv/tcgplayer', category: 85, fetchedAt: '2026-10-05T00:00:00Z', providerUpdatedAt: '2026-10-04T20:05:38Z',
   prices: {
     '900001': [['Normal', 1.0]], '900002': [['Normal', 2.0], ['Reverse Holofoil', 3.5]], '900003': [['Normal', 0]],
-    '900021': [['Normal', 0.5]], '900022': [['Normal', 0.5]],
+    '900021': [['Normal', 0.5]], '900022': [['Normal', 0.5]], '900011': [['Normal', 4.0]], '900004': [['Normal', 5.0]], '900005': [['Normal', 6.0]], '900006': [['Normal', 7.0]],
   },
 };
 export const fxOk = { base: 'USD', quote: 'JPY', rate: 150, date: '2026-10-02' };
@@ -43,7 +51,7 @@ export type FlowOptions = {
 };
 export async function installPokemonFlow(page: Page, options: FlowOptions = {}): Promise<{ tcgdexRequests: string[] }> {
   await page.addInitScript(({ products, portrait }) => {
-    const state = { id: '900001', present: true, hold: false, frames: 0, score: .623, margin: .01, latency: 10, sizes: [] as number[][] };
+    const state = { id: '900001', top: [] as { id: string; score: number }[], present: true, hold: false, frames: 0, inits: 0, started: [] as number[], score: .623, margin: .01, latency: 10, sizes: [] as number[][] };
     Object.assign(window, { continuousProbe: state, immersiveProbe: state });
     navigator.mediaDevices.getUserMedia = async () => {
       const c = document.createElement('canvas'); c.width = portrait ? 720 : 1280; c.height = portrait ? 1280 : 720;
@@ -54,11 +62,12 @@ export async function installPokemonFlow(page: Page, options: FlowOptions = {}):
       onmessage: ((e: { data: unknown }) => void) | null = null;
       postMessage(data: { type: string; bitmap?: ImageBitmap }) {
         if (data.bitmap) state.sizes.push([data.bitmap.width, data.bitmap.height]);
-        data.bitmap?.close(); if (data.type === 'frame') state.frames++;
+        data.bitmap?.close(); if (data.type === 'frame') state.frames++; if (data.type === 'init') { state.inits++; state.started.push(performance.now()); }
         if (state.hold && data.type === 'frame') return;
         const snapshot = { ...state }; const meta = (products as Record<string, { set: string; number: string }>)[snapshot.id];
         setTimeout(() => this.onmessage?.({ data: data.type === 'init' ? { type: 'ready', catalogVersion: 52 } : {
           type: 'result', cardId: snapshot.id, cardName: 'SYNTHETIC English name', catalogMeta: meta ? { set: meta.set, collectorNumber: meta.number, rarity: 'Common', group: null } : null,
+          topMatches: (snapshot.top.length ? snapshot.top : [{ id: snapshot.id, score: snapshot.score }]).map(m => { const mm = (products as Record<string, { set: string; number: string }>)[m.id]; return { cardId: m.id, cardName: null, catalogMeta: mm ? { set: mm.set, collectorNumber: mm.number, rarity: null, group: null } : null, score: m.score }; }),
           cardPresent: snapshot.present, cornersValid: snapshot.present, corners: [[.1, .1], [.9, .1], [.9, .9], [.1, .9]], score: snapshot.score, margin: snapshot.margin,
         } }), data.type === 'init' ? 10 : snapshot.latency);
       }
@@ -81,6 +90,7 @@ export async function installPokemonFlow(page: Page, options: FlowOptions = {}):
   await page.route('https://api.frankfurter.dev/**', route => options.fx === 'fail' ? route.fulfill({ status: 503, json: {} }) : route.fulfill({ json: fxOk }));
   return { tcgdexRequests };
 }
+export const startScan = (page: Page) => page.getByRole('button', { name: 'スキャン開始', exact: true }).click();
 export const setProbe = (page: Page, patch: Record<string, unknown>) => page.evaluate(p => Object.assign((window as unknown as { continuousProbe: object }).continuousProbe, p), patch);
 export const frames = (page: Page) => page.evaluate(() => (window as unknown as { continuousProbe: { frames: number } }).continuousProbe.frames);
 export const tinyPng = (page: Page) => page.evaluate(() => { const c = document.createElement('canvas'); c.width = c.height = 2; return c.toDataURL().split(',')[1]!; });
