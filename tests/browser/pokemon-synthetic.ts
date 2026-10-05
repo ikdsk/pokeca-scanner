@@ -3,12 +3,12 @@ import type { Page } from '@playwright/test';
 // Names, ids and prices are invented for tests. They are not provider data and prove nothing about
 // real recognition, TCGdex/TCGplayer coverage or phone performance.
 
-export type Product = { set: string; number: string };
+export type Product = { set: string; number: string; rarity?: string }; // rarity = TCGplayer name as in catalogMeta
 // product id (TCGplayer-style decimal string) -> catalog row metadata the worker would report
 export const products: Record<string, Product> = {
-  '900001': { set: 'TST: Synthetic Set', number: '001/066' },
-  '900002': { set: 'TST: Synthetic Set', number: '002/066' },
-  '900003': { set: 'TST: Synthetic Set', number: '003/066' },
+  '900001': { set: 'TST: Synthetic Set', number: '001/066', rarity: 'Super Rare' }, // TCGdex fixture says 'C': printed symbol must follow TCGplayer
+  '900002': { set: 'TST: Synthetic Set', number: '002/066', rarity: 'Ultra Rare' }, // TCGdex fixture says 'R'
+  '900003': { set: 'TST: Synthetic Set', number: '003/066', rarity: 'None' }, // unmapped -> no rarity shown
   '900021': { set: 'TST2: Synthetic Set Two', number: '161/165' },
   '900022': { set: 'TST2: Synthetic Set Two', number: '161/165' },
   '900011': { set: 'TST: Synthetic Set', number: '001/066' }, // another product of TST-001 (pattern variant)
@@ -64,10 +64,10 @@ export async function installPokemonFlow(page: Page, options: FlowOptions = {}):
         if (data.bitmap) state.sizes.push([data.bitmap.width, data.bitmap.height]);
         data.bitmap?.close(); if (data.type === 'frame') state.frames++; if (data.type === 'init') { state.inits++; state.started.push(performance.now()); }
         if (state.hold && data.type === 'frame') return;
-        const snapshot = { ...state }; const meta = (products as Record<string, { set: string; number: string }>)[snapshot.id];
+        const snapshot = { ...state }; const meta = (products as Record<string, { set: string; number: string; rarity?: string }>)[snapshot.id];
         setTimeout(() => this.onmessage?.({ data: data.type === 'init' ? { type: 'ready', catalogVersion: 52 } : {
-          type: 'result', cardId: snapshot.id, cardName: 'SYNTHETIC English name', catalogMeta: meta ? { set: meta.set, collectorNumber: meta.number, rarity: 'Common', group: null } : null,
-          topMatches: (snapshot.top.length ? snapshot.top : [{ id: snapshot.id, score: snapshot.score }]).map(m => { const mm = (products as Record<string, { set: string; number: string }>)[m.id]; return { cardId: m.id, cardName: null, catalogMeta: mm ? { set: mm.set, collectorNumber: mm.number, rarity: null, group: null } : null, score: m.score }; }),
+          type: 'result', cardId: snapshot.id, cardName: 'SYNTHETIC English name', catalogMeta: meta ? { set: meta.set, collectorNumber: meta.number, rarity: meta.rarity ?? null, group: null } : null,
+          topMatches: (snapshot.top.length ? snapshot.top : [{ id: snapshot.id, score: snapshot.score }]).map(m => { const mm = (products as Record<string, { set: string; number: string; rarity?: string }>)[m.id]; return { cardId: m.id, cardName: null, catalogMeta: mm ? { set: mm.set, collectorNumber: mm.number, rarity: mm.rarity ?? null, group: null } : null, score: m.score }; }),
           cardPresent: snapshot.present, cornersValid: snapshot.present, corners: [[.1, .1], [.9, .1], [.9, .9], [.1, .9]], score: snapshot.score, margin: snapshot.margin,
         } }), data.type === 'init' ? 10 : snapshot.latency);
       }

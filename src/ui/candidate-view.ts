@@ -3,7 +3,7 @@ import { hare2SearchUrl, type PokeCard } from '../data/pokemon.js';
 export type CandidateView = {
   name: string;
   expansion: string;
-  rarity: string | null;
+  rarity: { label: string; aria: string } | null;
   regulation: { label: string; aria: string } | null;
   imageUrl: string | null;
   matchNote: string | null;
@@ -15,7 +15,8 @@ export function candidateView(card: PokeCard): CandidateView {
   return {
     name: card.nameJa,
     expansion: `${card.setNameJa} ${card.setId} ${number}`,
-    rarity: card.rarity,
+    // card.rarity holds the printed symbol (see withPrintedRarity), never the TCGdex name.
+    rarity: card.rarity ? { label: card.rarity, aria: `レアリティ ${card.rarity}` } : null,
     regulation: card.regulationMark ? { label: card.regulationMark, aria: `レギュレーションマーク ${card.regulationMark}` } : null,
     imageUrl: card.imageUrl,
     matchNote: card.matchMethod === 'set_number' ? '番号で照合' : null,

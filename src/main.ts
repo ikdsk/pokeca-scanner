@@ -11,6 +11,7 @@ import { ReferenceImage } from './ui/reference-image.js';
 import { PriceSession } from './ui/price-session.js';
 import { priceView } from './ui/price-view.js';
 import { candidateView, thumbnailUrls } from './ui/candidate-view.js';
+import { withPrintedRarity } from './domain/rarity.js';
 import { createSnapshotLoader } from './ui/snapshot-loader.js';
 import { CardIdentity } from './ui/card-identity.js';
 import { RearmTracker } from './ui/rearm.js';
@@ -300,9 +301,19 @@ function rememberMeta(candidate: RecognitionResult, raw: string | null): void {
   matchesById.set(raw, candidate.topMatches ?? []);
   while (matchesById.size > 50) matchesById.delete(matchesById.keys().next().value!);
 }
+// TCGplayer rarity per recognized product id (catalogMeta); a product without meta is absent -> no rarity shown.
+const rarityByProduct = new Map<string, string | null>();
+function rememberRarity(cardId: string | null | undefined, meta: { rarity: string | null } | null | undefined): void {
+  if (!cardId || !meta) return;
+  rarityByProduct.delete(cardId); rarityByProduct.set(cardId, meta.rarity);
+  while (rarityByProduct.size > 300) rarityByProduct.delete(rarityByProduct.keys().next().value!);
+}
+// The UI never shows the TCGdex rarity: the card carries the printed symbol of its own product instead.
+const withProductRarity = (card: PokeCard): PokeCard => withPrintedRarity(card, rarityByProduct.get(card.tcgplayerId));
 // Maps the observed product id to the displayed card's identity before the live-candidate gate sees it.
 function observe(candidate: RecognitionResult, now: number): Suggestion | null {
   const raw = candidate.cardId;
+  rememberRarity(raw, candidate.catalogMeta); for (const match of candidate.topMatches ?? []) rememberRarity(match.cardId, match.catalogMeta);
   if (candidate.cardPresent === false) { if (rearm.observe(false, now)) handled.clear(); } else rearm.observe(true, now);
   if (!raw) return tentative.observe({ ...candidate }, now);
   const canonical = identity.canonical(raw);
@@ -319,7 +330,7 @@ function resolveMatch(match: TopMatch): Promise<PokeCard | null> {
   }
   return known;
 }
-const resolveAll = (matches: readonly TopMatch[]): Promise<ResolvedMatch[]> => Promise.all(matches.map(async match => ({ cardId: match.cardId, score: match.score, card: await resolveMatch(match) })));
+const resolveAll = (matches: readonly TopMatch[]): Promise<ResolvedMatch[]> => Promise.all(matches.map(async match => ({ cardId: match.cardId, score: match.score, card: await resolveMatch(match).then(card => card && withProductRarity(card)) })));
 function presentSuggestion(next: Suggestion | null): void {
   // Sticky: nothing observed ever clears a shown card; only a newer verified card replaces it.
   if (!next) return;
@@ -333,8 +344,9 @@ function presentSuggestion(next: Suggestion | null): void {
     if (loadingSuggestion?.version === next.version) loadingSuggestion = null;
     resolveStatus.textContent = note; if (!suggestion) emptyCandidate.textContent = idleText;
   };
-  void cardInfo.get(next.cardId).then(card => {
+  void cardInfo.get(next.cardId).then(known => {
     if (loadingSuggestion?.version !== next.version || !tentative.current(next)) return;
+    const card = known && withProductRarity(known);
     if (!card) { settle('カード情報を確認できない候補は表示しません（TCGdexに未登録のカードの可能性）'); return; }
     const canonical = identity.learn(next.cardId, card.tcgdexId);
     // Same displayed card under another product id: adopt silently, no flicker and no new proposal.
@@ -373,7 +385,7 @@ function showCard(card: PokeCard): void {
 }
 function metaNodes(view: ReturnType<typeof candidateView>): HTMLElement[] {
   const nodes: HTMLElement[] = [];
-  if (view.rarity) nodes.push(el('span', `レアリティ ${view.rarity}`, 'rarity'));
+  if (view.rarity) { const badge = el('span', view.rarity.label, 'rarity-badge'); badge.setAttribute('aria-label', view.rarity.aria); badge.title = view.rarity.aria; nodes.push(badge); }
   if (view.regulation) { const badge = el('span', view.regulation.label, 'regulation-badge'); badge.setAttribute('aria-label', view.regulation.aria); badge.title = view.regulation.aria; nodes.push(badge); }
   if (view.matchNote) nodes.push(el('span', view.matchNote, 'match-note muted'));
   return nodes;

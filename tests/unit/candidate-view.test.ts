@@ -4,7 +4,7 @@ import { pokeCard } from './fixtures.js';
 // SYNTHETIC fixtures only.
 it('shows the Japanese name, expansion with number, rarity, regulation badge and image (SYNTHETIC)', () => {
   expect(candidateView(pokeCard)).toMatchObject({
-    name: 'ヤナップ', expansion: '古代の咆哮 SV4K 001/066', rarity: 'C', imageUrl: pokeCard.imageUrl,
+    name: 'ヤナップ', expansion: '古代の咆哮 SV4K 001/066', rarity: { label: 'C', aria: 'レアリティ C' }, imageUrl: pokeCard.imageUrl,
     regulation: { label: 'G', aria: 'レギュレーションマーク G' }, matchNote: null,
   });
 });
@@ -27,4 +27,7 @@ it('lists thumbnails in fallback order: TCGdex low, then TCGplayer 200w (SYNTHET
   expect(thumbnailUrls(pokeCard)).toEqual(['https://assets.tcgdex.net/ja/SV/SV4K/001/low.webp', 'https://tcgplayer-cdn.tcgplayer.com/product/565756_200w.jpg']);
   expect(thumbnailUrls({ ...pokeCard, imageUrl: 'https://evil.example/a/high.webp' })).toEqual(['https://tcgplayer-cdn.tcgplayer.com/product/565756_200w.jpg']);
   expect(thumbnailUrls({ ...pokeCard, imageUrl: null, tcgplayerId: 'x' })).toEqual([]);
+});
+it('shows the printed symbol held in card.rarity as a labelled badge, never a TCGdex name (SYNTHETIC)', () => {
+  expect(candidateView({ ...pokeCard, rarity: 'SR' }).rarity).toEqual({ label: 'SR', aria: 'レアリティ SR' });
 });

@@ -13,7 +13,8 @@ test('candidate shows Japanese name, expansion+number, rarity, regulation badge,
   await installPokemonFlow(page); await page.goto('/'); await startCamera(page);
   await expect(panel(page).locator('strong').first()).toHaveText('テストA');
   await expect(panel(page)).toContainText('テスト拡張 TST 001/066');
-  await expect(panel(page).locator('.rarity')).toHaveText('レアリティ C');
+  await expect(panel(page).locator('.rarity-badge')).toHaveText('SR'); // TCGplayer 'Super Rare', not the TCGdex 'C'
+  await expect(panel(page).locator('.rarity-badge')).toHaveAttribute('aria-label', 'レアリティ SR'); await expect(panel(page)).not.toContainText('レアリティ C');
   await expect(panel(page).locator('.regulation-badge')).toHaveText('G');
   await expect(panel(page).locator('.regulation-badge')).toHaveAttribute('aria-label', 'レギュレーションマーク G');
   await expect(panel(page).locator('.match-note')).toHaveCount(0);

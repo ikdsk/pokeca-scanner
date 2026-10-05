@@ -7,7 +7,7 @@ test('collapsed dock shows the regulation mark badge and expansion name + code (
   const panel = page.locator('.candidate-dock .tentative'); await expect(panel).toBeVisible();
   const badge = panel.locator('.regulation-badge'); await expect(badge).toBeInViewport(); await expect(badge).toHaveText('G');
   await expect(badge).toHaveAttribute('aria-label', 'レギュレーションマーク G');
-  await expect(panel).toContainText('テスト拡張 TST 001/066'); await expect(panel.locator('.rarity')).toBeInViewport();
+  await expect(panel).toContainText('テスト拡張 TST 001/066'); await expect(panel.locator('.rarity-badge')).toBeInViewport();
   await expect(panel.locator('.price')).toHaveText('参考価格 ￥150'); await expect(panel.locator('.usd')).toHaveText('$1.00 USD');
   await expect(panel.getByRole('button', { name: '履歴に保存', exact: true })).toBeInViewport(); await expect(panel.getByRole('button', { name: '他の候補', exact: true })).toBeInViewport();
   await expect(page.getByRole('button', { name: '候補パネルを拡大' })).toHaveCount(0); await expect(page.getByRole('button', { name: '候補パネルを縮小' })).toHaveCount(0);
