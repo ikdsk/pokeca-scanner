@@ -79,3 +79,11 @@ Also: Krookodile 143/086 vs Japanese ワルビアル matches by eye (same Pokém
 - A possible later improvement (needs coordinator decision): fallback via TCGdex search by name/number, or a prebuilt tcgplayerId→tcgdexId map at build time.
 - Real check used `npx tsx` (downloaded ad hoc, not added to package.json). No package/contract edits.
 Final `npm run check`: typecheck clean; 20 test files / 196 tests passed.
+
+## Coordinator amendment — contract v1.1 (2026-10-05, Opus 5.5)
+- Decision: drop the printed `/count` comparison from the `set_number` fallback. Set code + numeric localId + "TCGdex has no tcgplayer refs" remain required.
+- Reason: real TCGdex SV11B reports `cardCount.official = 174` while printed numbers are `/086`; the strict rule nulled every SV11B card. Set code already separates sibling sets (SV11B vs SV11W).
+- RED: `npx vitest run tests/unit/pokemon-data.test.ts -t 'ignores a printed'` → 1 failed (SV11B-143 ワルビアル, 143/086 vs official 174).
+- GREEN: removed the count clause in `setNumberMatches`; the two tests that pinned the old rejection now pin the new acceptance. `npm run check` → 197 passed.
+- Real spot check (TCGdex ja, no tcgplayer refs → eligible for fallback): SV11B-143 ワルビアル, M2-001 ナゾノクサ, M1L-001 フシギダネ, SV2a-010 キャタピー.
+- Residual risk: a wrong set-code mapping on the TCGplayer side would now match by number alone within that set. QA should eye-check `set_number` results; UI may label them.

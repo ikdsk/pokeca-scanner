@@ -44,10 +44,9 @@ function setNumberMatches(c: Record<string, unknown>, variants: unknown[], meta:
   const set = record(c.set);
   const metaSet = meta.set.split(':')[0]!.trim();
   if (typeof set?.id !== 'string' || set.id.toLowerCase() !== metaSet.toLowerCase()) return false;
-  const [left = '', right] = meta.collector_number.split('/');
+  const [left = ''] = meta.collector_number.split('/');
   const wanted = numeric(left.trim());
-  if (wanted === null || typeof c.localId !== 'string' || numeric(c.localId) !== wanted) return false;
-  return right === undefined || (numeric(right.trim()) !== null && numeric(right.trim()) === count(record(set.cardCount)?.official));
+  return wanted !== null && typeof c.localId === 'string' && numeric(c.localId) === wanted;
 }
 export function parseTcgdexCard(json: unknown, tcgplayerId: string, meta?: CatalogMeta): PokeCard | null {
   const c = record(json);

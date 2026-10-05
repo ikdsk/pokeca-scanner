@@ -124,12 +124,19 @@ describe('parseTcgdexCard set_number guards', () => {
   it('treats any tcgplayer ref (string or number) as "has refs"', () => {
     expect(parseTcgdexCard(noRefs({ variants_detailed: [{ type: 'normal', thirdParty: { tcgplayer: '5' } }] }), '777', m)).toBeNull();
   });
-  it('rejects a different official count', () => { expect(parseTcgdexCard(noRefs(), '777', { ...m, collector_number: '010/166' })).toBeNull(); });
-  it('rejects a non-numeric or missing-official count when the number has a /part', () => {
-    expect(parseTcgdexCard(noRefs(), '777', { ...m, collector_number: '010/DP-P' })).toBeNull();
-    expect(parseTcgdexCard(noRefs({ set: { id: 'SV11B', name: 'ブラックボルト' } }), '777', m)).toBeNull();
+  // Superseded by contract v1.1: printed /count is not compared (see SV11B test below). Kept as behavior pins.
+  it('still matches when the printed /count differs (count not compared since contract v1.1)', () => { expect(parseTcgdexCard(noRefs(), '777', { ...m, collector_number: '010/166' })?.matchMethod).toBe('set_number'); });
+  it('still matches when the /part is non-numeric or TCGdex official count is missing', () => {
+    expect(parseTcgdexCard(noRefs(), '777', { ...m, collector_number: '010/DP-P' })?.matchMethod).toBe('set_number');
+    expect(parseTcgdexCard(noRefs({ set: { id: 'SV11B', name: 'ブラックボルト' } }), '777', m)?.matchMethod).toBe('set_number');
   });
   it('accepts a number without /count', () => { expect(parseTcgdexCard(noRefs(), '777', { ...m, collector_number: '010' })?.matchMethod).toBe('set_number'); });
+  // Contract v1.1 (coordinator, 2026-10-05): the printed /count is NOT compared. Real TCGdex SV11B reports official 174
+  // while cards print /086 (SV11W prints /086 too); the set code already separates sibling sets.
+  it('ignores a printed /count that disagrees with TCGdex official count (real SV11B shape: 174 vs /086)', () => {
+    const sv11b = noRefs({ id: 'SV11B-143', name: 'ワルビアル', localId: '143', set: { id: 'SV11B', name: 'ブラックボルト', cardCount: { official: 174, total: 174 } } });
+    expect(parseTcgdexCard(sv11b, '888', { set: 'SV11B: Black Bolt', collector_number: '143/086' })).toMatchObject({ tcgdexId: 'SV11B-143', matchMethod: 'set_number' });
+  });
   it('rejects a different set code, but compares case-insensitively', () => {
     expect(parseTcgdexCard(noRefs(), '777', { ...m, set: 'SV11W: White Flare' })).toBeNull();
     expect(parseTcgdexCard(noRefs(), '777', { ...m, set: 'sv11b: Black Bolt' })?.matchMethod).toBe('set_number');
