@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-10-03T12:37:28Z",
+  "checked_at": "2026-10-04T13:15:12Z",
   "families": {
     "milo1": {
       "embedding": {
@@ -10,82 +10,173 @@
         "layout": "row-major"
       },
       "catalogs": {
-        "scryfall/mtg": {
-          "public_name": "scryfall-mtg",
+        "tcgplayer/pokemon-japan": {
+          "public_name": "tcgplayer-pokemon-japan",
           "descriptor": {
-            "game": "magic-the-gathering",
-            "source": "scryfall",
-            "profile": "default",
-            "description": "English-first paper printings from Scryfall default cards.",
-            "result_identifier": "scryfall_card",
+            "game": "pokemon-japan",
+            "source": "tcgplayer",
+            "profile": "printings",
+            "description": "TCGplayer marketplace printing catalog.",
+            "result_identifier": "tcgplayer_product",
             "recommended": true
           },
-          "current_version": 52,
-          "rows": 113113,
-          "source_updated_at": "2026-10-03T09:05:39.295Z",
+          "current_version": 16,
+          "rows": 27593,
+          "source_updated_at": "2026-09-29T20:05:57Z",
           "base": {
-            "version": 50,
-            "rows": 113111,
-            "source_updated_at": "2026-10-01T09:05:35.752Z",
+            "version": 10,
+            "rows": 27348,
+            "source_updated_at": "2026-09-10T20:05:09Z",
             "assets": {
               "embeddings": {
-                "url": "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/scryfall-mtg/version/50/base/embeddings.f16.gz",
-                "size": 26470640,
-                "sha256": "d27cdf0317aea27d53cba81a97929584b4c7dc0fb168abf9e37d5ef971167cab"
+                "url": "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/tcgplayer-pokemon-japan/version/10/base/embeddings.f16.gz",
+                "size": 6450374,
+                "sha256": "91dde792600c4e43cf35f2c3d8fc920e78970d2be1ced2a4c38e80e06f3e66e3"
               },
               "records": {
-                "url": "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/scryfall-mtg/version/50/base/records.jsonl.gz",
-                "size": 9055736,
-                "sha256": "ac911eccb86334015ad9e01b569728ef590df8a1fccf8bad04f03ab419493ad6"
+                "url": "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/tcgplayer-pokemon-japan/version/10/base/records.jsonl.gz",
+                "size": 397021,
+                "sha256": "dc85858b7031525c02bdf2758817fdd272f3fb42478207b17807c606d2b2534b"
               }
             }
           },
           "updates": {
-            "51": {
-              "from_version": 50,
-              "to_version": 51,
+            "11": {
+              "from_version": 10,
+              "to_version": 11,
               "rows": {
-                "added": 0,
-                "updated": 11,
+                "added": 1,
+                "updated": 0,
                 "deleted": 0
               },
-              "recognition_rows": 11,
-              "metadata_rows": 0,
-              "source_updated_at": "2026-10-02T09:05:46.742Z",
+              "recognition_rows": 1,
+              "metadata_rows": 1,
+              "source_updated_at": "2026-09-11T20:05:58Z",
               "assets": {
                 "embeddings": {
-                  "url": "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/scryfall-mtg/version/51/delta-from-50/embeddings.f16.gz",
-                  "size": 2675,
-                  "sha256": "f9ce2d14b5c4aef8de072c76dd862d5a92fb99d93186f0d9acff81337e9deccd"
+                  "url": "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/tcgplayer-pokemon-japan/version/11/delta-from-10/embeddings.f16.gz",
+                  "size": 279,
+                  "sha256": "a9009a059de79a8cdf12ac70db2b815889afae3a1c17cf6007730f64a1b7b71d"
                 },
                 "records": {
-                  "url": "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/scryfall-mtg/version/51/delta-from-50/records.jsonl.gz",
-                  "size": 891,
-                  "sha256": "58776d8afaee2c579f0e6e60cf25afcb0191d0fc3958245df0228b7b740d347f"
+                  "url": "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/tcgplayer-pokemon-japan/version/11/delta-from-10/records.jsonl.gz",
+                  "size": 212,
+                  "sha256": "7216f68e816fcc15a944f2d0062abec3bc05113e3e6a50ed2b534642eab15fbc"
                 }
               }
             },
-            "52": {
-              "from_version": 51,
-              "to_version": 52,
+            "12": {
+              "from_version": 11,
+              "to_version": 12,
               "rows": {
-                "added": 2,
-                "updated": 315,
+                "added": 222,
+                "updated": 0,
                 "deleted": 0
               },
-              "recognition_rows": 317,
-              "metadata_rows": 2,
-              "source_updated_at": "2026-10-03T09:05:39.295Z",
+              "recognition_rows": 222,
+              "metadata_rows": 222,
+              "source_updated_at": "2026-09-16T20:05:50Z",
               "assets": {
                 "embeddings": {
-                  "url": "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/scryfall-mtg/version/52/delta-from-51/embeddings.f16.gz",
-                  "size": 74822,
-                  "sha256": "992d102a5f01c4dc1a01db8debe7bf853ab2d4fec4bdc26b58e628a788c492a9"
+                  "url": "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/tcgplayer-pokemon-japan/version/12/delta-from-11/embeddings.f16.gz",
+                  "size": 52431,
+                  "sha256": "4b7ea7d36ca81a077d53442343a913e5b5b1cdbff86c4ac5e12313fb440a8798"
                 },
                 "records": {
-                  "url": "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/scryfall-mtg/version/52/delta-from-51/records.jsonl.gz",
-                  "size": 21524,
-                  "sha256": "cf355bfe2d2a749b085853d6c29ebc225f7a4b3f1fd3bd0d850edc1b17e72e0a"
+                  "url": "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/tcgplayer-pokemon-japan/version/12/delta-from-11/records.jsonl.gz",
+                  "size": 4235,
+                  "sha256": "fc7a2847a23023498c1667c358857e241eb9ace2b48d0d47cedcdcd1d827af3c"
+                }
+              }
+            },
+            "13": {
+              "from_version": 12,
+              "to_version": 13,
+              "rows": {
+                "added": 21,
+                "updated": 182,
+                "deleted": 0
+              },
+              "recognition_rows": 203,
+              "metadata_rows": 52,
+              "source_updated_at": "2026-09-22T20:05:22Z",
+              "assets": {
+                "embeddings": {
+                  "url": "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/tcgplayer-pokemon-japan/version/13/delta-from-12/embeddings.f16.gz",
+                  "size": 47942,
+                  "sha256": "6995d73640d6791c176760ac9f0183498301d7ad47d0b13781b020702546f893"
+                },
+                "records": {
+                  "url": "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/tcgplayer-pokemon-japan/version/13/delta-from-12/records.jsonl.gz",
+                  "size": 3464,
+                  "sha256": "6139ced4926396bd10d07b22a62c8d4ca9084320d4b405539abf7453e11b9ad0"
+                }
+              }
+            },
+            "14": {
+              "from_version": 13,
+              "to_version": 14,
+              "rows": {
+                "added": 1,
+                "updated": 40,
+                "deleted": 0
+              },
+              "recognition_rows": 1,
+              "metadata_rows": 41,
+              "source_updated_at": "2026-09-23T20:06:02Z",
+              "assets": {
+                "embeddings": {
+                  "url": "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/tcgplayer-pokemon-japan/version/14/delta-from-13/embeddings.f16.gz",
+                  "size": 279,
+                  "sha256": "27b3156c7251abdabeecac7b05874701ae1891747dbdcfd23c3d6e15d9537b56"
+                },
+                "records": {
+                  "url": "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/tcgplayer-pokemon-japan/version/14/delta-from-13/records.jsonl.gz",
+                  "size": 928,
+                  "sha256": "cd049c1cd50b3ebfa186d7edf2487e241878e2d03a33bf97b282ed658b0ee9a4"
+                }
+              }
+            },
+            "15": {
+              "from_version": 14,
+              "to_version": 15,
+              "rows": {
+                "added": 0,
+                "updated": 65,
+                "deleted": 0
+              },
+              "recognition_rows": 0,
+              "metadata_rows": 65,
+              "source_updated_at": "2026-09-24T20:05:50Z",
+              "assets": {
+                "records": {
+                  "url": "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/tcgplayer-pokemon-japan/version/15/delta-from-14/records.jsonl.gz",
+                  "size": 1385,
+                  "sha256": "34e23c6b1afe032a2b0a6e9cb45bc485242420f226a5f1c2fc27489a7a8d6c08"
+                }
+              }
+            },
+            "16": {
+              "from_version": 15,
+              "to_version": 16,
+              "rows": {
+                "added": 0,
+                "updated": 9,
+                "deleted": 0
+              },
+              "recognition_rows": 9,
+              "metadata_rows": 0,
+              "source_updated_at": "2026-09-29T20:05:57Z",
+              "assets": {
+                "embeddings": {
+                  "url": "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/tcgplayer-pokemon-japan/version/16/delta-from-15/embeddings.f16.gz",
+                  "size": 2205,
+                  "sha256": "335cdcd68bb9e3aa7b02440dcabbe0b5820b0a25207d61e21fc56b713e6ae302"
+                },
+                "records": {
+                  "url": "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/tcgplayer-pokemon-japan/version/16/delta-from-15/records.jsonl.gz",
+                  "size": 262,
+                  "sha256": "c2a7ae3318bb1b00d7ab43b0225a71d17fee013dbceb490ded8ab0dfbb6e1ac4"
                 }
               }
             }

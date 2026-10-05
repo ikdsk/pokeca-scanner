@@ -24,7 +24,7 @@ async function download(url, path, hash, size) {
 try {
   for (const [key, url] of Object.entries(manifest.models)) await download(url, `assets/models/${key === 'milo' ? 'milo' : 'detector'}.onnx`, manifest.model_hashes[key], manifest.model_sizes[key]);
   const feed = JSON.parse(await readFile(resolve(root, 'catalog-feed-v2.json'), 'utf8'));
-  const catalog = feed.families.milo1.catalogs['scryfall/mtg'];
+  const catalog = feed.families.milo1.catalogs['tcgplayer/pokemon-japan'];
   for (const entry of [catalog.base, ...Object.values(catalog.updates)]) for (const asset of Object.values(entry.assets)) await download(asset.url, 'assets/catalog/' + asset.url.split('/catalog-v2/')[1], asset.sha256, asset.size);
   for (const name of ['ort.webgpu.min.mjs', 'ort-wasm-simd-threaded.asyncify.mjs', 'ort-wasm-simd-threaded.asyncify.wasm']) await download(`https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/${name}`, `vendor/${name}`);
   await download('https://raw.githubusercontent.com/microsoft/onnxruntime/v1.24.3/LICENSE', 'vendor/LICENSE', '2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c');

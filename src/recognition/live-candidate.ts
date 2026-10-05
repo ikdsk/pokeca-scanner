@@ -8,12 +8,13 @@ export class LiveCandidate {
  private absentSince: number | null = null;
  private absentCount = 0;
  constructor(private threshold = .5, private rearmCount = 3, private rearmMs = 600) {}
- observe(c: Candidate & {oracleId?: string | undefined}, now: number): Suggestion | null {
+ /** Identity is the TCGplayer product id (`cardId`). `oracleId` is a type-only shim for the legacy main.ts call site and is ignored. */
+ observe(c: Candidate & {oracleId?: undefined}, now: number): Suggestion | null {
   if(c.cardPresent === false) {
    this.absentSince ??= now; this.absentCount++;
    if(this.absentCount >= this.rearmCount && now-this.absentSince >= this.rearmMs) {this.suppressed.clear();this.dismissed=null;}
   } else { this.absentSince=null; this.absentCount=0; }
-  const identity=c.oracleId || c.cardId;
+  const identity=c.cardId;
   if(c.cardPresent && c.cornersValid && c.score!==null && Number.isFinite(c.score) && c.score>=this.threshold && identity && identity!==this.dismissed) this.dismissed=null;
   if(!c.cardPresent || !c.cornersValid || !c.cardId || !identity || c.score===null || !Number.isFinite(c.score) || c.score<this.threshold || (this.suppressed.has(identity)||this.dismissed===identity)) { this.pending=null; return null; }
   if(this.pending?.cardId===c.cardId && this.pending.identity===identity) this.pending={...this.pending,score:c.score};

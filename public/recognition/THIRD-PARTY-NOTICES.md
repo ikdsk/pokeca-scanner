@@ -7,7 +7,7 @@ repository and retain its AGPL-3.0 terms. Full license: `LICENSE-AGPL-3.0.txt`.
 Authors and contributors retain their copyrights. No separate commercial or
 noncommercial license has been obtained. The worker is modified to pin assets,
 force one-thread WASM, verify model hashes, bound downloads, allow a local asset
-mirror, retain init messages during runtime import, and return a margin between distinct card identities. The catalog client
+mirror, retain init messages during runtime import, and return a margin between the best and second-best catalog rows plus the top-5 matches (tcgplayer/pokemon-japan). The catalog client
 is modified to retain a previously complete,
 compatible cached snapshot when an update fails. Runtime import and local gzip
 transport were corrected. This application is not represented as MIT licensed.
@@ -17,14 +17,17 @@ Cornelius 2.12: HanClinto/cornelius @
 Milo 1.0.0: HanClinto/milo @ `9bcc5e809e936b8c5630d1e7101aae1de1e76621`,
 AGPL-3.0 model-card declaration. Models are downloaded, never committed.
 
-CollectorVisionCatalog v52, embedding family milo1, Scryfall MTG:
-pinned base v50 + deltas v51/v52, original feed checked_at
-2026-10-03T12:37:28Z. Feed source blob `037ff1f2e74faccfdeea9043f0a021bff138bc82`.
-This app commits only the MTG descriptor/URLs/hashes, not catalog data or images.
-Catalog repository software MIT license does not establish rights to underlying
-card data, images, or embedding redistribution. Review these separately before
-public use. Data is English-first paper printings; Japanese recognition accuracy
-and physical printing/language/finish inference are not established.
+CollectorVisionCatalog `tcgplayer/pokemon-japan` (embedding family milo1, source
+tcgplayer, result identifier `tcgplayer_product`): pinned base v10 + deltas v11-v16
+(current_version 16, 27,593 rows), feed checked_at 2026-10-04T13:15:12Z, fetched
+2026-10-05. The bundled feed snapshot is that catalog entry only, with already-folded
+deltas v1-v10 removed. This app commits only the descriptor/URLs/hashes, not catalog
+data or images. CollectorVision treats non-MTG catalogs as a PREVIEW: they are less
+validated than the MTG catalog, and recognition accuracy on physical cards, printing
+variants (e.g. "Poke Ball Pattern" products share set and number with the normal
+card), language and finish is not established. Catalog repository software MIT license
+does not establish rights to underlying card data, images, or embedding redistribution.
+Review these separately before public use.
 
 ONNX Runtime Web 1.24.3, Microsoft/contributors, MIT. Runtime downloaded from
 version-pinned jsDelivr npm distribution; preserve its LICENSE and third-party

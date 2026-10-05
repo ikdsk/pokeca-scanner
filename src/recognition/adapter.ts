@@ -1,6 +1,15 @@
 import { manifest } from './manifest.js';
 import type { Candidate } from './gate.js';
-export type RecognitionResult = Candidate & { margin: number; corners?: unknown; scryfallOracleId?: string; timing?: Record<string, number> };
+/** Record metadata of the matched catalog row (tcgplayer/pokemon-japan); fields are null when the catalog lacks them. */
+export type CatalogMeta = { set: string | null; collectorNumber: string | null; rarity: string | null; group: string | null };
+export type TopMatch = { cardId: string; cardName: string | null; score: number };
+/** `cardId` is the TCGplayer product id (decimal string). */
+export type RecognitionResult = Candidate & {
+  margin: number; corners?: unknown; timing?: Record<string, number>;
+  cardName?: string | null; catalogMeta?: CatalogMeta | null; topMatches?: TopMatch[];
+  /** @deprecated MTG leftover, always undefined; type-only shim until main.ts drops it. */
+  scryfallOracleId?: undefined;
+};
 export class Recognizer {
   private worker: Worker | null = null;
   private ready: Promise<void> | null = null;
@@ -13,7 +22,7 @@ export class Recognizer {
     if (this.ready) return this.ready;
     this.ready = new Promise((resolve, reject) => {
       this.rejectReady = reject;
-      this.progress('認識データを準備中（初回 約45MB＋実行環境）');
+      this.progress('認識データを準備中（初回 約17MB＋実行環境）');
       const local = new URL(location.href).searchParams.has('localAssets');
       const w = new Worker(`/recognition/scanner.worker.mjs${local ? '?local' : ''}`, { type: 'module' }); this.worker = w;
       const fail = (error: Error) => { if (w !== this.worker) return; reject(error); this.waiting?.reject(error); this.waiting = null; this.dispose(); };
