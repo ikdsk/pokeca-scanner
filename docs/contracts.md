@@ -37,8 +37,8 @@ resolveCard(tcgplayerId, catalogMeta, signal): Promise<PokeCard | null>
   fetch `GET https://api.tcgdex.net/v2/ja/cards/{id}`.
   1. `matchMethod: 'tcgplayer_id'` — some `variants_detailed[].thirdParty.tcgplayer` equals `tcgplayerId`.
   2. `matchMethod: 'set_number'` — ONLY when the TCGdex card has NO tcgplayer cross-reference at all, AND
-     set code equals `set.id` (case-insensitive), AND numeric localId equals the number's left part, AND the number's right part
-     (if present) equals `set.cardCount.official`. A card that has tcgplayer refs pointing to OTHER ids is a mismatch → null.
+     set code equals `set.id` (case-insensitive), AND numeric localId equals the number's left part.
+     (v1.1: the printed `/count` is NOT compared — TCGdex SV11B reports official 174 while cards print /086.) A card that has tcgplayer refs pointing to OTHER ids is a mismatch → null.
   3. Otherwise null (do not display).
   Reason (2026-10-05 coordinator probe): TCGdex has tcgplayer refs for SV4K/SV8/SV9 (8/8 sampled) but 0/8 for SV11B, M1L, M2 —
   the newest sets most users scan. `PokeCard` gains `matchMethod`.
