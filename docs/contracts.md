@@ -59,3 +59,10 @@ quote(tcgplayerId, groupId?, signal): Promise<UsdQuote[]>
 - Replace MTG format badges with regulation mark + (later) standard legality; remove Scryfall/mana wording.
 - Hareruya2 link: `https://www.hareruya2.com/search?type=product&q=${encodeURIComponent(`${nameJa} ${localId}/${officialCount} ${setId}`)}`.
   Link only; no fetch of Hareruya2.
+
+## Card text (v1.2, issue #13)
+- `PokeCard.text?: CardText` parsed defensively from the same TCGdex ja card JSON (no extra request).
+- CardText: category, illustrator; Pokémon: hp, types[], stage, evolveFrom, abilities[{type,name,effect}],
+  attacks[{cost[],name,effect,damage}], weaknesses/resistances[{type,value}], retreat, description;
+  Trainer: trainerType, effect; Energy: energyType, effect. Malformed items dropped; never invented.
+- Shown only in the detail sheet; absent → 「カードテキストは未収録です」.
