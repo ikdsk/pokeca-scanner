@@ -6,7 +6,6 @@ export type CandidateView = {
   rarity: { label: string; aria: string } | null;
   regulation: { label: string; aria: string } | null;
   imageUrl: string | null;
-  matchNote: string | null;
   hare2: { href: string; label: string };
 };
 const pad = (value: number): string => String(value).padStart(3, '0');
@@ -19,7 +18,6 @@ export function candidateView(card: PokeCard): CandidateView {
     rarity: card.rarity ? { label: card.rarity, aria: `レアリティ ${card.rarity}` } : null,
     regulation: card.regulationMark ? { label: card.regulationMark, aria: `レギュレーションマーク ${card.regulationMark}` } : null,
     imageUrl: card.imageUrl,
-    matchNote: card.matchMethod === 'set_number' ? '番号で照合' : null,
     hare2: { href: hare2SearchUrl(card), label: '晴れる屋2で探す ↗' },
   };
 }

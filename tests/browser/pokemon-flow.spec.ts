@@ -17,7 +17,7 @@ test('candidate shows Japanese name, expansion+number, rarity, regulation badge,
   await expect(panel(page).locator('.rarity-badge')).toHaveAttribute('aria-label', 'レアリティ SR'); await expect(panel(page)).not.toContainText('レアリティ C');
   await expect(panel(page).locator('.regulation-badge')).toHaveText('G');
   await expect(panel(page).locator('.regulation-badge')).toHaveAttribute('aria-label', 'レギュレーションマーク G');
-  await expect(panel(page).locator('.match-note')).toHaveCount(0);
+  await expect(panel(page).locator('.match-note')).toHaveCount(0); await expect(page.locator('body')).not.toContainText('番号で照合');
   await expect(panel(page).locator('img')).toHaveAttribute('src', 'https://assets.tcgdex.net/ja/TST/TST/001/high.webp');
   await expect(panel(page).locator('.price')).toHaveText('参考価格 ￥150');
   await expect(panel(page).locator('.usd')).toHaveText('$1.00 USD');
@@ -41,11 +41,11 @@ test('until the card resolves the raw id is never shown and nothing can be saved
   await stopCamera(page);
 });
 
-test('set_number matches carry a muted note and still price by product id (SYNTHETIC)', async ({ page }) => {
+test('set_number matches show no match note and still price by product id (SYNTHETIC)', async ({ page }) => {
   await installPokemonFlow(page); await page.goto('/'); await setProbe(page, { id: '900021' }); await startCamera(page);
   await expect(panel(page).locator('strong').first()).toHaveText('テストD');
   await expect(panel(page)).toContainText('テスト拡張2 TST2 161/165');
-  await expect(panel(page).locator('.match-note')).toHaveText('番号で照合');
+  await expect(panel(page).locator('.match-note')).toHaveCount(0); await expect(page.locator('body')).not.toContainText('番号で照合');
   await expect(panel(page).locator('.usd')).toHaveText('$0.50 USD');
   await stopCamera(page);
 });

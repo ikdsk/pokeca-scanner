@@ -392,7 +392,6 @@ function rarityNodes(view: ReturnType<typeof candidateView>): HTMLElement[] {
 function metaNodes(view: ReturnType<typeof candidateView>): HTMLElement[] {
   const nodes: HTMLElement[] = [];
   if (view.regulation) { const badge = el('span', view.regulation.label, 'regulation-badge'); badge.setAttribute('aria-label', view.regulation.aria); badge.title = view.regulation.aria; nodes.push(badge); }
-  if (view.matchNote) nodes.push(el('span', view.matchNote, 'match-note muted'));
   return nodes;
 }
 // 同じカードの別商品: other TCGplayer products of the displayed TCGdex card, each with its own USD price.

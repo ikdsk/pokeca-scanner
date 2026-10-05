@@ -5,7 +5,7 @@ import { pokeCard } from './fixtures.js';
 it('shows the Japanese name, expansion with number, rarity, regulation badge and image (SYNTHETIC)', () => {
   expect(candidateView(pokeCard)).toMatchObject({
     name: 'ヤナップ', expansion: '古代の咆哮 SV4K 001/066', rarity: { label: 'C', aria: 'レアリティ C' }, imageUrl: pokeCard.imageUrl,
-    regulation: { label: 'G', aria: 'レギュレーションマーク G' }, matchNote: null,
+    regulation: { label: 'G', aria: 'レギュレーションマーク G' },
   });
 });
 it('omits the printed count when unknown and the badge/rarity when absent (SYNTHETIC)', () => {
@@ -13,8 +13,9 @@ it('omits the printed count when unknown and the badge/rarity when absent (SYNTH
   expect(view.expansion).toBe('古代の咆哮 SV4K 001');
   expect(view.regulation).toBeNull(); expect(view.rarity).toBeNull(); expect(view.imageUrl).toBeNull();
 });
-it('labels set_number matches with a muted note (SYNTHETIC)', () => {
-  expect(candidateView({ ...pokeCard, matchMethod: 'set_number' }).matchNote).toBe('番号で照合');
+it('never exposes a match-method note, even for set_number matches (SYNTHETIC)', () => {
+  const view = candidateView({ ...pokeCard, matchMethod: 'set_number' });
+  expect(view).not.toHaveProperty('matchNote'); expect(JSON.stringify(view)).not.toContain('番号で照合');
 });
 it('builds the 晴れる屋2 link from the card (link only) (SYNTHETIC)', () => {
   const { hare2 } = candidateView(pokeCard);
