@@ -160,3 +160,27 @@ describe('resolveCard set_number fallback (fake fetch)', () => {
     expect(r?.matchMethod).toBe('set_number');
   });
 });
+
+// SYNTHETIC-from-real: meta strings are copied from catalog rows (catalog-v2 tcgplayer-pokemon-japan v10);
+// TCGdex ids/shapes were verified live on 2026-10-05 (see docs/reports/resolve-fallback.md).
+describe('set name aliases (catalog set names without a CODE: prefix)', () => {
+  it('maps Start Deck 100 Battle Collection to TCGdex MC (unpadded 3-digit localId)', () => {
+    expect(candidateTcgdexId({ set: 'Start Deck 100 Battle Collection', collector_number: '741/742' })).toBe('MC-741');
+  });
+  it('maps SV-P Promotional Cards to SV-P; the number is the left part of 001/SV-P', () => {
+    expect(candidateTcgdexId({ set: 'SV-P Promotional Cards', collector_number: '001/SV-P' })).toBe('SV-P-001');
+    expect(candidateTcgdexId({ set: 'M-P Promotional Cards', collector_number: '001/M-P' })).toBe('M-P-001');
+  });
+  it('maps "+" set codes to the TCGdex id that actually holds the cards (SM4+ is an empty stub, SM4p has them)', () => {
+    expect(candidateTcgdexId({ set: 'SM4+: GX Battle Boost', collector_number: '001/114' })).toBe('SM4p-001');
+  });
+  it('never guesses: an unknown name-only set stays unresolved', () => {
+    expect(candidateTcgdexId({ set: 'BW-P Promotional cards', collector_number: '001/BW-P' })).toBeNull();
+    expect(candidateTcgdexId({ set: 'Start Deck 100 Battle Collection', collector_number: undefined })).toBeNull();
+  });
+  it('set_number match accepts the aliased set id (MC card without tcgplayer refs)', () => {
+    const mc = { id: 'MC-741', name: 'レガシーエネルギー', localId: '741', set: { id: 'MC', name: 'スタートデッキ100 バトルコレクション', cardCount: { official: 742 } }, variants_detailed: [{ type: 'normal', thirdParty: { cardmarket: 864043 } }] };
+    const parsed = parseTcgdexCard(mc, '669718', { set: 'Start Deck 100 Battle Collection', collector_number: '741/742' });
+    expect(parsed?.matchMethod).toBe('set_number'); expect(parsed?.tcgdexId).toBe('MC-741');
+  });
+});
