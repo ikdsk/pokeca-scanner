@@ -62,7 +62,7 @@ for (const id of ['900099', 'unknown-product']) test(`candidate with no resolvab
 test('metadata provider failure hides the candidate and says so without inventing a card (SYNTHETIC)', async ({ page }) => {
   await installPokemonFlow(page); await page.route('https://api.tcgdex.net/v2/ja/cards/TST-001', route => route.abort());
   await page.goto('/'); await startCamera(page);
-  await expect(page.locator('.camera-info')).toContainText('カード情報を取得できません'); await expect(panel(page)).toBeHidden();
+  await expect(page.locator('.camera-info')).toContainText('通信に失敗しました'); await expect(panel(page)).toBeHidden();
   await stopCamera(page);
 });
 

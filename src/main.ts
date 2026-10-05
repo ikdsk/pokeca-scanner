@@ -334,6 +334,12 @@ function resolveMatch(match: TopMatch): Promise<PokeCard | null> {
   return known;
 }
 const resolveAll = (matches: readonly TopMatch[]): Promise<ResolvedMatch[]> => Promise.all(matches.map(async match => ({ cardId: match.cardId, score: match.score, card: await resolveMatch(match).then(card => card && withProductRarity(card)) })));
+function cardInfoErrorText(error: Error): string {
+  const retry = 'カードを一度外してもう一度かざしてください。';
+  if (error.name === 'TimeoutError') return `通信がタイムアウトしました。電波の良い場所で、${retry}`;
+  if (error instanceof TypeError) return `通信に失敗しました。接続を確認し、${retry}`;
+  return `カード情報を取得できません。通信を確認し、${retry}`;
+}
 function presentSuggestion(next: Suggestion | null): void {
   // Sticky: nothing observed ever clears a shown card; only a newer verified card replaces it.
   if (!next) return;
@@ -363,7 +369,11 @@ function presentSuggestion(next: Suggestion | null): void {
     if (canonical !== next.cardId && handled.has(canonical)) { settle(''); return; }
     if (holdLive()) { queuedVerified = { next, card }; loadingSuggestion = null; return; }
     commitSuggestion(next, card);
-  }).catch(() => { if (loadingSuggestion?.version === next.version && tentative.current(next)) settle('カード情報を取得できません。通信を確認し、カードを一度外してもう一度かざしてください。'); });
+  }).catch((error: unknown) => {
+    const failure = error instanceof Error ? error : new Error(String(error));
+    mark('card-info-error', { name: failure.name, message: failure.message, tcgdexId: candidateTcgdexId(metaById.get(next.cardId) ?? {}) });
+    if (loadingSuggestion?.version === next.version && tentative.current(next)) settle(cardInfoErrorText(failure));
+  });
 }
 function commitSuggestion(next: Suggestion, card: PokeCard): void {
   // Commit the verified card and its UI together; the previous card stays usable until here.
