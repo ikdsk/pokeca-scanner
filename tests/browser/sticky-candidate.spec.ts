@@ -24,7 +24,7 @@ test('a verified replacement swaps in without passing through an empty panel (SY
 test('an unresolvable or failed replacement never evicts the shown candidate (SYNTHETIC)', async ({ page }) => {
   await installPokemonFlow(page); await page.route('https://api.tcgdex.net/v2/ja/cards/TST-002', route => route.abort());
   await page.goto('/'); await startScan(page); const panel = page.locator('.tentative'); await expect(panel).toContainText('テストA');
-  await setProbe(page, { id: '900002' }); await expect(page.locator('.camera-info')).toContainText('カード情報を取得できません');
+  await setProbe(page, { id: '900002' }); await expect(page.locator('.camera-info')).toContainText('通信に失敗しました');
   await expect(panel).toBeVisible(); await expect(panel).toContainText('テストA');
   await setProbe(page, { id: '900099' }); await more(page, 5); await expect(panel).toContainText('テストA');
 });

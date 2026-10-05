@@ -86,3 +86,49 @@ it('aborts a request queued behind another cooldown waiter immediately (SYNTHETI
     expect(transport).toHaveBeenCalledTimes(2);
   } finally { vi.useRealTimers(); }
 });
+// Safari < 17.4 has no AbortSignal.any and Safari < 16 has no AbortSignal.timeout (issue #14).
+const withoutStatics = async (names: ('any' | 'timeout')[], run: () => Promise<void>) => {
+  const saved = names.map(name => [name, (AbortSignal as any)[name]] as const);
+  for (const name of names) Object.defineProperty(AbortSignal, name, { value: undefined, configurable: true, writable: true });
+  try { await run(); } finally { for (const [name, value] of saved) Object.defineProperty(AbortSignal, name, { value, configurable: true, writable: true }); }
+};
+const okFetcher = () => vi.fn(async (_url: unknown, init?: RequestInit) => { expect(init?.signal).toBeInstanceOf(AbortSignal); return new Response('{"ok":true}'); });
+it('fetches with a caller signal when AbortSignal.any is missing (SYNTHETIC old Safari)', async () => {
+  await withoutStatics(['any'], async () => {
+    const fetcher = okFetcher();
+    await expect(new JsonClient(fetcher as typeof fetch, 0).get('https://api.tcgdex.net/v2/ja/cards/a', new AbortController().signal)).resolves.toEqual({ ok: true });
+  });
+});
+it('fetches when AbortSignal.any and AbortSignal.timeout are both missing, with and without a caller signal (SYNTHETIC)', async () => {
+  await withoutStatics(['any', 'timeout'], async () => {
+    const fetcher = okFetcher(); const http = new JsonClient(fetcher as typeof fetch, 0);
+    await expect(http.get('https://api.tcgdex.net/v2/ja/cards/a')).resolves.toEqual({ ok: true });
+    await expect(http.get('https://api.tcgdex.net/v2/ja/cards/b', new AbortController().signal)).resolves.toEqual({ ok: true });
+  });
+});
+it('manual signal composition still honors caller abort and the timeout (SYNTHETIC)', async () => {
+  await withoutStatics(['any', 'timeout'], async () => {
+    const hang = (_url: unknown, init?: RequestInit) => new Promise<Response>((_, reject) => init!.signal!.addEventListener('abort', () => reject(init!.signal!.reason), { once: true }));
+    const abort = new AbortController(); const fetcher = vi.fn(hang);
+    const first = new JsonClient(fetcher as typeof fetch, 0, 1000, 5000).get('https://api.tcgdex.net/v2/ja/cards/a', abort.signal);
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1)); const reason = new Error('caller'); abort.abort(reason);
+    await expect(first).rejects.toBe(reason);
+    const slow = new JsonClient(vi.fn(hang) as typeof fetch, 0, 1000, 20);
+    await expect(slow.get('https://api.tcgdex.net/v2/ja/cards/b')).rejects.toMatchObject({ name: 'TimeoutError' });
+  });
+});
+it('retries one transient network failure (TypeError) and one timeout, never HTTP 4xx or a second failure (SYNTHETIC)', async () => {
+  const url = 'https://api.tcgdex.net/v2/ja/cards/a';
+  const flaky = vi.fn().mockRejectedValueOnce(new TypeError('Load failed')).mockResolvedValue(new Response('{"ok":true}'));
+  await expect(new JsonClient(flaky as typeof fetch, 0).get(url)).resolves.toEqual({ ok: true }); expect(flaky).toHaveBeenCalledTimes(2);
+  const hang = vi.fn((_u: unknown, init?: RequestInit) => new Promise<Response>((resolve, reject) => {
+    if (hang.mock.calls.length > 1) resolve(new Response('{"ok":true}')); else init!.signal!.addEventListener('abort', () => reject(init!.signal!.reason), { once: true });
+  }));
+  await expect(new JsonClient(hang as typeof fetch, 0, 1000, 20).get(url)).resolves.toEqual({ ok: true }); expect(hang).toHaveBeenCalledTimes(2);
+  const notFound = vi.fn(async () => new Response('{}', { status: 404 }));
+  await expect(new JsonClient(notFound as typeof fetch, 0).get(url)).rejects.toBeInstanceOf(ProviderError); expect(notFound).toHaveBeenCalledTimes(1);
+  const down = vi.fn().mockRejectedValue(new TypeError('Load failed'));
+  await expect(new JsonClient(down as typeof fetch, 0).get(url)).rejects.toBeInstanceOf(TypeError); expect(down).toHaveBeenCalledTimes(2);
+  const abort = new AbortController(); const gone = vi.fn(async () => { abort.abort(); throw new TypeError('Load failed'); });
+  await expect(new JsonClient(gone as typeof fetch, 0).get(url, abort.signal)).rejects.toThrow(); expect(gone).toHaveBeenCalledTimes(1);
+});

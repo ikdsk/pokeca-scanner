@@ -20,6 +20,21 @@ function abortable<T>(job: Promise<T>, signal?: AbortSignal): Promise<T> {
     void job.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort));
   });
 }
+type Bounded = { signal: AbortSignal; dispose: () => void };
+// Safari < 16 lacks AbortSignal.timeout and Safari < 17.4 lacks AbortSignal.any: compose by hand there (issue #14).
+function bound(signal: AbortSignal | undefined, ms: number): Bounded {
+  if (typeof AbortSignal.timeout === 'function' && (!signal || typeof AbortSignal.any === 'function')) {
+    const timeout = AbortSignal.timeout(ms);
+    return { signal: signal ? AbortSignal.any([signal, timeout]) : timeout, dispose: () => undefined };
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new DOMException('The operation timed out.', 'TimeoutError')), ms);
+  const relay = () => controller.abort(signal!.reason);
+  signal?.addEventListener('abort', relay, { once: true });
+  if (signal?.aborted) relay();
+  return { signal: controller.signal, dispose: () => { clearTimeout(timer); signal?.removeEventListener('abort', relay); } };
+}
+const transient = (error: unknown): boolean => error instanceof TypeError || (error instanceof Error && error.name === 'TimeoutError');
 class Schedule {
   private queue: Promise<unknown> = Promise.resolve();
   private lastStart = 0;
@@ -68,9 +83,15 @@ export class JsonClient {
       const gap = scryfall ? Math.max(slow ? 510 : 110, this.gap) : this.gap;
       await schedule.reserve(gap, signal);
       signal?.throwIfAborted();
-      const bounded = signal ? AbortSignal.any([signal, AbortSignal.timeout(this.timeout)]) : AbortSignal.timeout(this.timeout);
       const fetcher = this.fetcher;
-      const response = await fetcher(url, { signal: bounded, headers: { Accept: 'application/json' } });
+      // One automatic retry for transient network failures (fetch TypeError / timeout); never for HTTP statuses or caller aborts.
+      let response!: Response;
+      for (let attempt = 0; ; attempt++) {
+        const bounded = bound(signal, this.timeout);
+        try { response = await fetcher(url, { signal: bounded.signal, headers: { Accept: 'application/json' } }); break; }
+        catch (error) { if (attempt > 0 || signal?.aborted || !transient(error)) throw error; }
+        finally { bounded.dispose(); }
+      }
       if (response.status === 429) schedule.limited(response);
       if (!response.ok) throw new ProviderError(response.status === 429 ? 'アクセス制限中です。時間をおいて再試行してください。' : `情報を取得できません（HTTP ${response.status}）`, response.status);
       const value: unknown = await response.json();
