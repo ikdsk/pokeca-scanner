@@ -90,10 +90,10 @@ test('several subtypes: Normal is shown, the others are listed small, none is si
   await stopCamera(page);
 });
 
-test('several subtypes without a Normal row: no price headline, never a substituted subtype (SYNTHETIC)', async ({ page }) => {
+test('several subtypes without a matching row: no price headline, never a substituted subtype (SYNTHETIC)', async ({ page }) => {
   const ambiguous = { source: 'tcgcsv/tcgplayer', category: 85, fetchedAt: '2026-10-05T00:00:00Z', providerUpdatedAt: null, prices: { '900001': [['Holofoil', 9], ['Reverse Holofoil', 8]] } };
   await installPokemonFlow(page, { prices: ambiguous }); await page.goto('/'); await startCamera(page);
-  await expect(panel(page).locator('.price')).toHaveText('価格の種類を特定できません'); await expect(panel(page).locator('.usd')).toHaveCount(0);
+  await expect(panel(page).locator('.price')).toHaveText('版により価格が異なります'); await expect(panel(page).locator('.usd')).toHaveCount(0);
   await stopCamera(page);
 });
 

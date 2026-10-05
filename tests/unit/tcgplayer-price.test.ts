@@ -79,17 +79,26 @@ describe('quote', () => {
 
 describe('chooseQuote', () => {
   const q = (subType: string): UsdQuote => ({ tcgplayerId: '1', subType, usdMarket: '1.00', source: 'tcgplayer', providerUpdatedAt: null });
-  it('returns the sole quote when no variant is requested', () => {
+  it('uses the sole quote whatever the TCGdex variant is (product id = the printing)', () => {
+    expect(chooseQuote([q('Holofoil')], 'holo')).toEqual(q('Holofoil'));
+    expect(chooseQuote([q('1st Edition')], 'normal')).toEqual(q('1st Edition'));
     expect(chooseQuote([q('Normal')])).toEqual(q('Normal'));
+    expect(chooseQuote([q('Holofoil')], null)).toEqual(q('Holofoil'));
   });
-  it('returns null (never guesses) when several subtypes exist and none is requested', () => {
+  it('with several subtypes maps normal/holo/reverse through an explicit table', () => {
+    const all = [q('Normal'), q('Holofoil'), q('Reverse Holofoil')];
+    expect(chooseQuote(all, 'normal')).toEqual(q('Normal'));
+    expect(chooseQuote(all, 'holo')).toEqual(q('Holofoil'));
+    expect(chooseQuote(all, 'reverse')).toEqual(q('Reverse Holofoil'));
+    expect(chooseQuote(all, 'HOLO')).toEqual(q('Holofoil'));
+  });
+  it('returns null (never guesses) when several subtypes exist and the variant is absent, unknown or unmatched', () => {
     expect(chooseQuote([q('Normal'), q('Holofoil')])).toBeNull();
-  });
-  it('matches a requested variant exactly, ignoring case', () => {
-    expect(chooseQuote([q('Normal'), q('Holofoil')], 'holofoil')).toEqual(q('Holofoil'));
-  });
-  it('does not fall back to another subtype when the requested one is missing', () => {
-    expect(chooseQuote([q('Normal')], 'Holofoil')).toBeNull();
-    expect(chooseQuote([], undefined)).toBeNull();
+    expect(chooseQuote([q('Normal'), q('Holofoil')], null)).toBeNull();
+    expect(chooseQuote([q('Normal'), q('Holofoil')], 'mystery')).toBeNull();
+    expect(chooseQuote([q('1st Edition'), q('Unlimited')], 'normal')).toBeNull();
+    expect(chooseQuote([q('1st Edition Holofoil'), q('Unlimited Holofoil')], 'holo')).toBeNull();
+    expect(chooseQuote([q('Normal'), q('Reverse Holofoil')], 'holo')).toBeNull();
+    expect(chooseQuote([], 'holo')).toBeNull();
   });
 });

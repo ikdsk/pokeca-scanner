@@ -28,9 +28,9 @@ export function priceView(input: PriceInput): PriceView {
   if (input.status === 'error') return { ...view, headline: '価格を取得できません' };
   if (input.quotes.length === 0) return { ...view, headline: 'この商品の価格データなし' };
   view.updatedAt = updated(input.quotes[0]!.providerUpdatedAt) ?? '価格の更新時刻は不明';
-  const chosen = chooseQuote(input.quotes, input.variant ?? (input.quotes.length > 1 ? 'Normal' : undefined));
+  const chosen = chooseQuote(input.quotes, input.variant);
   view.others = input.quotes.filter(q => q !== chosen).map(q => listed(q, input.fx));
-  if (!chosen) return { ...view, headline: '価格の種類を特定できません', note: 'この版に対応する価格区分を特定できないため、価格は表示しません。' };
+  if (!chosen) return { ...view, headline: '版により価格が異なります', note: 'この版に対応する価格区分を特定できないため、1つには決めず全区分を表示します。' };
   if (chosen.usdMarket === null) return { ...view, headline: 'この商品の価格なし' };
   const display = formatReferencePrice(chosen.usdMarket, input.fx);
   view.headline = display.jpy ? `概算 ${display.jpy}` : '概算JPYは利用できません';

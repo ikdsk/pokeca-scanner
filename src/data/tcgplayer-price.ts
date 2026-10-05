@@ -65,9 +65,15 @@ export function createTcgplayerPrice(load: SnapshotLoader) {
   };
 }
 
-// Picks the quote for a requested subtype, or the sole quote when none is requested.
-// Never substitutes a different subtype: ambiguity or a miss yields null.
-export function chooseQuote(quotes: readonly UsdQuote[], variant?: string): UsdQuote | null {
-  if (variant === undefined) return quotes.length === 1 ? quotes[0]! : null;
-  return quotes.find(quote => quote.subType.toLowerCase() === variant.toLowerCase()) ?? null;
+// TCGdex variant type -> TCGplayer subTypeName. Anything not listed (e.g. 1st Edition vs Unlimited) is unmappable.
+const SUBTYPE_BY_VARIANT: ReadonlyMap<string, string> = new Map([['normal', 'Normal'], ['holo', 'Holofoil'], ['reverse', 'Reverse Holofoil']]);
+
+// A product id identifies one printing, so a sole quote is used whatever the variant.
+// With several subtypes only the explicit table above may select one; otherwise null (never guess).
+export function chooseQuote(quotes: readonly UsdQuote[], variant?: string | null): UsdQuote | null {
+  if (quotes.length === 1) return quotes[0]!;
+  const subType = variant ? SUBTYPE_BY_VARIANT.get(variant.toLowerCase()) : undefined;
+  if (!subType) return null;
+  const matches = quotes.filter(quote => quote.subType === subType);
+  return matches.length === 1 ? matches[0]! : null;
 }
