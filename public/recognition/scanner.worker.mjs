@@ -12,15 +12,19 @@
 //   { type: 'progress', stage, ratio, loaded?, total?, cached?, inferenceMode? }
 //   { type: 'ready',    inferenceMode }
 //   { type: 'result',   cardPresent, cornersValid, corners, sharpness,
-//                       confidence, cardId, secondaryId, score,
+//                       confidence, cardId (TCGplayer product id), cardName,
+//                       catalogMeta {set, collectorNumber, rarity, group},
+//                       topMatches [{cardId, cardName, catalogMeta, score}], score, margin,
 //                       rawCorners, detectorInput,
 //                       detectorBitmap?, cropBitmap? }
 //   { type: 'error',    message }
 
-// Modified for MTG Card Scanner (2026-10-04): pinned WASM runtime, verified
-// model downloads, optional local assets, bounded requests, identity margin.
+// Modified for Pokéca Scanner (2026-10-05, from the MTG Card Scanner fork): pinned WASM runtime,
+// verified model downloads, optional local assets, bounded requests, tcgplayer/pokemon-japan
+// catalog (result id = TCGplayer product id), top-k search.
 // Original: HanClinto/CollectorVision @ 2a122d00d25c8d112a90e47bf235a021e0c53b0c
 // License: AGPL-3.0; see LICENSE-AGPL-3.0.txt and THIRD-PARTY-NOTICES.md.
+import { assertCompatibleCatalog, indexRecords, searchTop } from './lib/pokemon-catalog.mjs';
 const localAssets = new URL(self.location.href).searchParams.has('local');
 const ortBase = localAssets ? new URL('./vendor/', import.meta.url).href : 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/';
 // Install the message handler synchronously; top-level await can lose early init.
@@ -30,6 +34,7 @@ let ort;
 // Constants
 // ---------------------------------------------------------------------------
 
+const TOP_MATCHES = 5;
 const EMBEDDER_SIZE = 448;
 const DEWARP_W = EMBEDDER_SIZE;
 const DEWARP_H = EMBEDDER_SIZE;
@@ -261,49 +266,6 @@ function normalizeEmbedding(embedding) {
 
 function chooseBetterMatch(current, candidate) {
   return candidate.score > current.score ? candidate : current;
-}
-
-function snakeToCamel(value) {
-  return String(value).replace(/_([a-zA-Z0-9])/g, (_, char) => char.toUpperCase());
-}
-
-function secondaryCatalogKeyToFieldName(catalogKey) {
-  const key = String(catalogKey ?? "").trim();
-  if (!key) {
-    return null;
-  }
-  const base = key.replace(/_ids$/i, "_id");
-  const fieldName = snakeToCamel(base);
-  return fieldName || null;
-}
-
-function resolveSecondaryIdSource(catalog = {}) {
-  const explicitPath = typeof catalog.secondary_ids === "string"
-    ? catalog.secondary_ids
-    : null;
-  const explicitField = typeof catalog.secondary_id_field === "string"
-    ? catalog.secondary_id_field
-    : null;
-
-  if (explicitPath) {
-    return {
-      assetPath: explicitPath,
-      fieldName: explicitField || "secondaryId",
-    };
-  }
-
-  const candidates = Object.entries(catalog)
-    .filter(([key, value]) => key !== "card_ids" && /_ids$/i.test(key) && typeof value === "string")
-    .sort(([a], [b]) => a.localeCompare(b));
-  if (candidates.length === 0) {
-    return null;
-  }
-
-  const [catalogKey, assetPath] = candidates[0];
-  return {
-    assetPath,
-    fieldName: explicitField || secondaryCatalogKeyToFieldName(catalogKey) || "secondaryId",
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -592,8 +554,7 @@ class WorkerRuntime {
     this.embeddings = null;
     this.cardIds = null;
     this.cardNames = null;
-    this.secondaryIds = null;
-    this.secondaryIdField = null;
+    this.catalogMeta = null;
     this.dewarpCanvas = new OffscreenCanvas(DEWARP_W, DEWARP_H);
     this.dewarpCtx = this.dewarpCanvas.getContext("2d", { willReadFrequently: true });
     this.dewarpImageData = this.dewarpCtx.createImageData(DEWARP_W, DEWARP_H);
@@ -666,11 +627,9 @@ class WorkerRuntime {
     }
 
     const catalogAssetSizes = this.manifest.catalog.asset_sizes ?? {};
-    const secondarySource = resolveSecondaryIdSource(this.manifest.catalog);
     const catalogParts = [
       { key: "embeddings", size: catalogAssetSizes.embeddings },
       { key: "card_ids", size: catalogAssetSizes.card_ids },
-      ...(secondarySource ? [{ key: "oracle_ids", size: catalogAssetSizes.oracle_ids }] : []),
     ];
     const catalogTotal = catalogParts.reduce(
       (total, part) => total + (Number.isSafeInteger(part.size) && part.size > 0 ? part.size : 0),
@@ -702,15 +661,7 @@ class WorkerRuntime {
       catalogAssetSizes.card_ids,
       (ratio, loaded, total, cached) => reportCatalogProgress(1, loaded, total, cached),
     );
-    const secondaryIds = secondarySource
-      ? await fetchJsonCached(
-        `${this.assetBasePath}/${secondarySource.assetPath}`,
-        version,
-        catalogAssetSizes.oracle_ids,
-        (ratio, loaded, total, cached) => reportCatalogProgress(2, loaded, total, cached),
-      )
-      : null;
-    // Keep the catalog in its packed float16 form.  Expanding the full MTG
+    // Keep the catalog in its packed float16 form.  Expanding the full catalog
     // matrix to Float32Array roughly doubles steady-state catalog memory and
     // can push iOS WebKit into tab reloads.  Search converts individual values
     // through a 256 KB lookup table instead.
@@ -728,10 +679,6 @@ class WorkerRuntime {
       : embeddingBuffer;
     this.embeddings = wrapFloat16Buffer(retainedEmbeddingBuffer);
     this.cardIds = requestedRows < ids.length ? ids.slice(0, requestedRows) : ids;
-    this.secondaryIdField = secondarySource?.fieldName ?? null;
-    this.secondaryIds = Array.isArray(secondaryIds)
-      ? (requestedRows < secondaryIds.length ? secondaryIds.slice(0, requestedRows) : secondaryIds)
-      : null;
     this.catalogRows = Math.min(
       requestedRows,
       this.cardIds.length,
@@ -745,8 +692,8 @@ class WorkerRuntime {
     const moduleUrl = new URL("./lib/collectorvision-catalog-v2.mjs", import.meta.url);
     moduleUrl.search = new URL(import.meta.url).search;
     const { BrowserCatalogV2 } = await import(moduleUrl.href);
-    const catalog = await BrowserCatalogV2.forGame("mtg", {
-      includeMetadata: false,
+    const catalog = await BrowserCatalogV2.forGame("pokemon-japan", {
+      includeMetadata: true, // catalogMeta (set / collector number / rarity) is passed to the data layer
       feedUrl: new URL('./catalog-feed-v2.json', import.meta.url).href,
       fetchImpl: (url, options) => {
         let target = String(url);
@@ -754,13 +701,7 @@ class WorkerRuntime {
         return globalThis.fetch(target, { ...options, signal: AbortSignal.timeout(120000) });
       },
     });
-    if (catalog.embedding.model.split('@sha256:')[1] !== this.manifest.model_hashes.milo.split(':')[1] || !([50, 51, 52].includes(catalog.version))) throw new Error('Incompatible model/catalog snapshot');
-    const expectedDimensions = this.manifest.catalog.dims;
-    if (catalog.dimension !== expectedDimensions) {
-      throw new Error(
-        `Catalog v2 dimensions (${catalog.dimension}) do not match the scanner embedder (${expectedDimensions})`,
-      );
-    }
+    assertCompatibleCatalog(catalog, this.manifest);
 
     const requestedRows = this.catalogLimit
       ? Math.min(this.catalogLimit, catalog.rows)
@@ -772,10 +713,10 @@ class WorkerRuntime {
     this.embeddings = requestedRows < catalog.rows
       ? catalog.embeddings.slice(0, requestedRows * catalog.dimension)
       : catalog.embeddings;
-    this.cardIds = records.map((record) => record.id);
-    this.cardNames = records.map((record) => record.name);
-    this.secondaryIdField = "scryfallOracleId";
-    this.secondaryIds = records.map((record) => record.identifiers.scryfall_oracle ?? null);
+    const index = indexRecords(records);
+    this.cardIds = index.cardIds;
+    this.cardNames = index.cardNames;
+    this.catalogMeta = index.catalogMeta;
     this.catalogRows = requestedRows;
     this.catalogTotalRows = catalog.rows;
     this.catalogVersion = catalog.version;
@@ -958,38 +899,22 @@ class WorkerRuntime {
   search(query) {
     const dims = this.catalogDims ?? this.manifest.catalog.dims;
     const rows = this.catalogRows ?? this.manifest.catalog.rows;
-    let bestScore = -Infinity;
-    let bestIndex = -1;
-    const identityScores = new Map();
-
-    for (let row = 0; row < rows; row += 1) {
-      const offset = row * dims;
-      let score = 0;
-      for (let col = 0; col < dims; col += 1) {
-        score += FLOAT16_LOOKUP[this.embeddings[offset + col]] * query[col];
-      }
-      const identity = this.secondaryIds?.[row] ?? this.cardIds[row];
-      identityScores.set(identity, Math.max(identityScores.get(identity) ?? -Infinity, score));
-      if (score > bestScore) {
-        bestScore = score;
-        bestIndex = row;
-      }
-    }
-
-    const secondaryId = this.secondaryIds?.[bestIndex] ?? null;
-    const ranked = [...identityScores.values()].sort((a, b) => b - a);
-    const best = {
-      margin: ranked.length > 1 ? ranked[0] - ranked[1] : 1,
-      score: bestScore,
-      cardId: this.cardIds[bestIndex],
-      cardName: this.cardNames?.[bestIndex] ?? null,
-      secondaryId,
-      secondaryIdField: this.secondaryIdField,
+    const top = searchTop(this.embeddings, rows, dims, query, FLOAT16_LOOKUP, TOP_MATCHES);
+    const first = top[0];
+    return {
+      // Margin = gap to the runner-up row (every row is a distinct TCGplayer product).
+      margin: top.length > 1 ? first.score - top[1].score : 1,
+      score: first?.score ?? -Infinity,
+      cardId: first ? this.cardIds[first.index] : null,
+      cardName: first ? (this.cardNames?.[first.index] ?? null) : null,
+      catalogMeta: first ? (this.catalogMeta?.[first.index] ?? null) : null,
+      topMatches: top.map(({ index, score }) => ({
+        cardId: this.cardIds[index],
+        cardName: this.cardNames?.[index] ?? null,
+        catalogMeta: this.catalogMeta?.[index] ?? null,
+        score,
+      })),
     };
-    if (this.secondaryIdField && secondaryId !== null && secondaryId !== undefined) {
-      best[this.secondaryIdField] = secondaryId;
-    }
-    return best;
   }
 }
 
@@ -1040,8 +965,6 @@ async function processFrame(bitmap, captureRequested = false, includeDebugBitmap
       sharpness: detection.sharpness,
       confidence: detection.confidence,
       cardId: null,
-      secondaryId: null,
-      secondaryIdField: runtime?.secondaryIdField ?? null,
       score: null,
       rawCorners: runtime._lastRawCorners,
       detectorInput: runtime._lastDetectorInput,
@@ -1074,8 +997,6 @@ async function processFrame(bitmap, captureRequested = false, includeDebugBitmap
       sharpness: detection.sharpness,
       confidence: detection.confidence,
       cardId: null,
-      secondaryId: null,
-      secondaryIdField: runtime?.secondaryIdField ?? null,
       score: null,
       rawCorners: runtime._lastRawCorners,
       detectorInput: runtime._lastDetectorInput,
@@ -1107,8 +1028,8 @@ async function processFrame(bitmap, captureRequested = false, includeDebugBitmap
     confidence: detection.confidence,
     cardId: best.cardId,
     cardName: best.cardName,
-    secondaryId: best.secondaryId,
-    secondaryIdField: best.secondaryIdField,
+    catalogMeta: best.catalogMeta,
+    topMatches: best.topMatches,
     score: best.score,
     margin: best.margin,
     orientation: best.orientation,
@@ -1124,9 +1045,6 @@ async function processFrame(bitmap, captureRequested = false, includeDebugBitmap
       totalMs: performance.now() - tFrameStart,
     }),
   };
-  if (best.secondaryIdField && best.secondaryId !== null && best.secondaryId !== undefined) {
-    resultMessage[best.secondaryIdField] = best.secondaryId;
-  }
   self.postMessage(resultMessage, transfer2);
 }
 

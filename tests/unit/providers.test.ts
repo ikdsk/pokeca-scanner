@@ -1,26 +1,5 @@
 import { expect, it, vi } from 'vitest';
 import { JsonClient, ProviderError } from '../../src/data/http.js';
-import { Repository, FxProvider, parseFx, parseCard } from '../../src/data/repository.js';
-import { card } from './fixtures.js';
-it('retrieves every printing page, preserving exact language IDs (SYNTHETIC)', async () => {
-  const calls: string[] = [];
-  const fetcher = vi.fn(async (url: string | URL | Request) => {
-    calls.push(String(url));
-    return new Response(JSON.stringify(calls.length === 1 ? { data: [card], has_more: true, next_page: 'https://api.scryfall.com/cards/search?page=2' } : { data: [{ ...card, id: 'ja-id', lang: 'ja' }], has_more: false }));
-  });
-  const repo = new Repository(new JsonClient(fetcher as typeof fetch, 0));
-  expect((await repo.printings('o')).map(c => c.id)).toEqual(['a', 'ja-id']); expect(calls).toHaveLength(2);
-  expect(calls[0]).toContain('include_multilingual=true'); expect(calls[0]).toContain('unique=prints');
-});
-it('never follows a pagination URL to another origin (SYNTHETIC)', async () => {
-  const fetcher = vi.fn(async () => new Response(JSON.stringify({ data: [card], has_more: true, next_page: 'https://evil.example/cards/search' })));
-  await expect(new Repository(new JsonClient(fetcher as typeof fetch, 0)).printings('o')).rejects.toThrow('不正なページURL'); expect(fetcher).toHaveBeenCalledTimes(1);
-});
-it('rejects invalid FX and currency direction; valid provider-shaped zero prices survive (SYNTHETIC)', () => {
-  expect(parseFx({ base: 'USD', quote: 'JPY', rate: 150, date: '2026-10-02' })).toEqual({ jpyPerUsd: 150, asOf: '2026-10-02' });
-  for (const bad of [{ base: 'JPY', quote: 'USD', rate: 150, date: '2026-10-02' }, { base: 'USD', quote: 'JPY', rate: 0, date: '2026-10-02' }, { base: 'USD', quote: 'JPY', rate: 150, date: '2026-02-30' }]) expect(() => parseFx(bad)).toThrow();
-  expect(parseCard(card).prices.usd).toBe('0.00'); expect(() => parseCard({ ...card, prices: { usd: 4 } })).toThrow();
-});
 it('caches successful metadata, rejects abort even on cache hit, and never retries 429 automatically (SYNTHETIC)', async () => {
   const fetcher = vi.fn(async () => new Response(JSON.stringify({ value: 0 })));
   const http = new JsonClient(fetcher as typeof fetch, 0);
@@ -44,24 +23,6 @@ it('invokes injected transport without a JsonClient receiver (SYNTHETIC browser 
     return Promise.resolve(new Response('{"ok":true}'));
   };
   await expect(new JsonClient(transport as typeof fetch, 0).get('https://api.scryfall.com/cards/a')).resolves.toEqual({ ok: true });
-});
-it('invalid HTTP200 card responses do not poison retry caches (SYNTHETIC)', async () => {
-  const fetcher = vi.fn().mockResolvedValueOnce(new Response('{"id":"malformed"}')).mockResolvedValueOnce(new Response(JSON.stringify(card)));
-  const repo = new Repository(new JsonClient(fetcher as typeof fetch, 0));
-  await expect(repo.card('a')).rejects.toThrow();
-  await expect(repo.card('a')).resolves.toEqual(card);
-  expect(fetcher).toHaveBeenCalledTimes(2);
-});
-it('rejects mismatched card and printing identities without caching them (SYNTHETIC)', async () => {
-  const fetcher = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ ...card, id: 'other' }))).mockResolvedValueOnce(new Response(JSON.stringify(card)));
-  const repo = new Repository(new JsonClient(fetcher as typeof fetch, 0));
-  await expect(repo.card('a')).rejects.toThrow('対象が一致しません');
-  await expect(repo.card('a')).resolves.toEqual(card);
-  const pages = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ ...card, oracle_id: 'other' }], has_more: false }))).mockResolvedValueOnce(new Response(JSON.stringify({ data: [card], has_more: false })));
-  const printRepo = new Repository(new JsonClient(pages as typeof fetch, 0));
-  await expect(printRepo.printings(card.oracle_id)).rejects.toThrow('対象が一致しません');
-  await expect(printRepo.printings(card.oracle_id)).resolves.toEqual([card]);
-  expect(pages).toHaveBeenCalledTimes(2);
 });
 it('paces Scryfall search starts at least 500ms apart (SYNTHETIC fake clock)', async () => {
   vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-04T00:00:00Z'));
@@ -124,16 +85,4 @@ it('aborts a request queued behind another cooldown waiter immediately (SYNTHETI
     expect(immediate).toBe(true);
     expect(transport).toHaveBeenCalledTimes(2);
   } finally { vi.useRealTimers(); }
-});
-it('retries malformed FX and search HTTP200 responses instead of caching errors (SYNTHETIC)', async () => {
-  const fxTransport = vi.fn().mockResolvedValueOnce(new Response('{"base":"JPY","quote":"USD","rate":150,"date":"2026-10-02"}')).mockResolvedValueOnce(new Response('{"base":"USD","quote":"JPY","rate":150,"date":"2026-10-02"}'));
-  const fx = new FxProvider(new JsonClient(fxTransport as typeof fetch, 0));
-  await expect(fx.latest()).rejects.toThrow('為替情報が不正です');
-  await expect(fx.latest()).resolves.toEqual({ jpyPerUsd: 150, asOf: '2026-10-02' });
-  expect(fxTransport).toHaveBeenCalledTimes(2);
-  const searchTransport = vi.fn().mockResolvedValueOnce(new Response('{"data":[{}]}')).mockResolvedValueOnce(new Response(JSON.stringify({ data: [card], has_more: false })));
-  const repo = new Repository(new JsonClient(searchTransport as typeof fetch, 0));
-  await expect(repo.search('fixture')).rejects.toThrow();
-  await expect(repo.search('fixture')).resolves.toEqual({ cards: [card], next: null });
-  expect(searchTransport).toHaveBeenCalledTimes(2);
 });
