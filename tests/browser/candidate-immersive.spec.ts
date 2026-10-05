@@ -1,6 +1,6 @@
 import { openRoute, closeRoute } from './immersive-routes.js';
 import { test, expect, type Page } from '@playwright/test';
-const evidence='/Users/dikeda/workspace/mtg-card-scanner-research/candidate-immersive';
+const evidence=process.env.EVIDENCE_DIR ?? 'test-results/evidence/candidate-immersive';
 // SYNTHETIC portrait camera pixels, worker, reference image and providers.
 const card={id:'immersive-card',oracle_id:'immersive-oracle',name:'Synthetic Immersive',printed_name:'合成イマーシブ',lang:'ja',set:'tst',set_name:'Synthetic expansion',collector_number:'42',finishes:['nonfoil','foil'],prices:{usd:'2'},legalities:{standard:'legal',modern:'banned'},printed_text:'合成の長い印刷本文。\n'.repeat(45),oracle_text:'Synthetic Oracle rules.\n'.repeat(45),image_uris:{normal:'https://cards.scryfall.io/normal/immersive.jpg'}};
 async function setup(page:Page){
