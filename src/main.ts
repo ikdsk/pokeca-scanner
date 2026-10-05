@@ -356,7 +356,12 @@ async function resolveSuggestion(next: Suggestion): Promise<{ shown: Suggestion;
 function presentSuggestion(next: Suggestion | null): void {
   // Sticky: nothing observed ever clears a shown card; only a newer verified card replaces it.
   if (!next) return;
-  if (suggestion?.version === next.version) { if (shown === suggestionCard) tentativeScore.textContent = `類似度 ${next.score.toFixed(3)}`; return; }
+  if (suggestion?.version === next.version) {
+    // The score must belong to the displayed product: after a fallback, `suggestion.cardId` is not the observed top id.
+    const score = next.cardId === suggestion.cardId ? next.score : matchesById.get(next.cardId)?.find(match => match.cardId === suggestion!.cardId)?.score;
+    if (shown === suggestionCard && score !== undefined) tentativeScore.textContent = `類似度 ${score.toFixed(3)}`;
+    return;
+  }
   if (loadingSuggestion?.version === next.version || queuedVerified?.next.version === next.version) return;
   loadingSuggestion = next; cardInfo.cancelExcept(next.cardId); resolveStatus.textContent = '';
   if (!suggestion) { emptyCandidate.hidden = false; emptyCandidate.textContent = 'カード情報を確認中…'; }

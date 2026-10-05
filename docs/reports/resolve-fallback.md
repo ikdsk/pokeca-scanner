@@ -42,3 +42,15 @@ the 他の候補 dialog was still loading its other entries when captured, so I 
 - 8 MC energy rows have non-numeric collector numbers (GRA/FIR/WAT) and derive ids like `MC-WAT`, which 404 → unresolved (safe, never shown).
 - Alias names were verified by sampling (4–7 cards per set), not by full-set comparison.
 - docs/contracts.md not touched (coordinator).
+
+## Follow-up: score leak on re-observation (PR #17 CI failure)
+Bug: after a fallback, `suggestion` keeps the observation's version but holds the fallback product's cardId. The same-version early return in
+`presentSuggestion` overwrote the displayed 類似度 with `next.score`, the unresolvable TOP product's score (CI saw 0.830 instead of 0.660).
+Fix (`src/main.ts`): on a same-version re-observation, the score shown is `next.score` only when `next.cardId === suggestion.cardId`; otherwise it is
+the score of `suggestion.cardId` taken from that observation's topMatches, and unchanged when that product is absent from them.
+Other fields on that path: only the score text is touched there; name/rarity/price/alternatives are rendered from the resolved card in `showCard`
+(per-product rarity and price keyed by `card.tcgplayerId`), so nothing else from the top product leaks.
+- Deterministic test added (`re-observing the same candidate keeps the shown score…`): after the fallback is shown, the probe re-emits the same candidate with new scores (top .84, shown product .62) and waits for frames.
+  RED before the fix (panel showed the top product's score); GREEN after.
+- `npm run check`: 264 passed. `npm run build`: OK.
+- Playwright, 1 worker, port 4247: resolve-fallback `--repeat-each=10` → 60 passed (3 tests × 2 projects × 10); pokemon-flow + sticky-candidate + live-candidate → 76 passed.
