@@ -48,6 +48,7 @@ export type FlowOptions = {
   prices?: unknown | 'missing' | 'html';
   fx?: 'ok' | 'fail';
   portrait?: boolean;
+  longName?: string; // SYNTHETIC: replaces the Japanese name of TST-001 to exercise truncation
 };
 export async function installPokemonFlow(page: Page, options: FlowOptions = {}): Promise<{ tcgdexRequests: string[] }> {
   await page.addInitScript(({ products, portrait }) => {
@@ -79,7 +80,7 @@ export async function installPokemonFlow(page: Page, options: FlowOptions = {}):
   await page.route('https://api.tcgdex.net/v2/ja/cards/**', route => {
     const id = decodeURIComponent(new URL(route.request().url()).pathname.split('/').pop()!);
     tcgdexRequests.push(id);
-    return tcgdexCards[id] ? route.fulfill({ json: tcgdexCards[id] }) : route.fulfill({ status: 404, json: {} });
+    return tcgdexCards[id] ? route.fulfill({ json: id === 'TST-001' && options.longName ? { ...tcgdexCards[id], name: options.longName } : tcgdexCards[id] }) : route.fulfill({ status: 404, json: {} });
   });
   await page.route('https://assets.tcgdex.net/**', route => route.fulfill({ contentType: 'image/svg+xml', body: cardSvg }));
   await page.route('**/prices/pokemon-japan-usd.json', route => {

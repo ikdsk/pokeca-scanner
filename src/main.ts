@@ -77,7 +77,8 @@ const tentativeName = el('strong', '', 'candidate-name'); const tentativeScore =
 const tentativeMessage = el('p', '', 'candidate-message'); tentativeMessage.setAttribute('role', 'status'); const announcement = el('span', '', 'sr-only'); announcement.setAttribute('role', 'status');
 const tentativeLink = el('a', '', 'hare2-link'); tentativeLink.target = '_blank'; tentativeLink.rel = 'noopener noreferrer';
 const confirm = button('履歴に保存', () => confirmSuggestion()); const alternativesButton = button('他の候補', () => openAlternatives());
-const tentativeContent = el('div'); tentativeContent.append(tentativeName, tentativeExpansion, tentativeMeta);
+const tentativeNameLine = el('div', '', 'name-line'); tentativeNameLine.append(tentativeName);
+const tentativeContent = el('div'); tentativeContent.append(tentativeNameLine, tentativeExpansion, tentativeMeta);
 const tentativeActions = el('div', '', 'actions'); tentativeActions.append(confirm, alternativesButton);
 const tentativeSummary = el('div', '', 'candidate-summary'); tentativeSummary.append(tentativeReference.node, tentativeContent);
 const tentativeDetails = el('div', '', 'candidate-details'); tentativeDetails.id = 'candidate-details'; tentativeDetails.setAttribute('aria-label', '候補の詳細'); tentativeDetails.setAttribute('role', 'region'); tentativeDetails.tabIndex = 0;
@@ -377,15 +378,19 @@ function showCard(card: PokeCard): void {
   const revision = ++viewRevision; shown = card; const view = candidateView(card);
   candidatePrice.reset(); tentativeSources.replaceChildren(); tentativePrice.replaceChildren(); productsSection.remove(); productsSection.replaceChildren();
   if (!staticView) { const saved = suggestion !== null && savedVersion === suggestion.version && savedCardId === card.tcgplayerId; confirm.textContent = saved ? '保存しました ✓' : '履歴に保存'; tentativeMessage.textContent = saved ? '保存しました ✓' : '実物のカード（版・状態）は未確認'; }
-  tentativeName.textContent = view.name; tentativeExpansion.textContent = view.expansion;
+  tentativeName.textContent = view.name; tentativeNameLine.replaceChildren(tentativeName, ...rarityNodes(view)); tentativeExpansion.textContent = view.expansion;
   tentativeMeta.replaceChildren(...metaNodes(view), tentativeScore);
   tentativeReference.update(card); tentativeLink.textContent = view.hare2.label; tentativeLink.href = view.hare2.href; tentativeLink.hidden = false;
   void candidatePrice.select(card);
   if (!staticView) void loadProducts(card, suggestionMatches, revision);
 }
+// The printed rarity sits right after the card name (nothing when the product has none).
+function rarityNodes(view: ReturnType<typeof candidateView>): HTMLElement[] {
+  if (!view.rarity) return [];
+  const badge = el('span', view.rarity.label, 'rarity-badge'); badge.setAttribute('aria-label', view.rarity.aria); badge.title = view.rarity.aria; return [badge];
+}
 function metaNodes(view: ReturnType<typeof candidateView>): HTMLElement[] {
   const nodes: HTMLElement[] = [];
-  if (view.rarity) { const badge = el('span', view.rarity.label, 'rarity-badge'); badge.setAttribute('aria-label', view.rarity.aria); badge.title = view.rarity.aria; nodes.push(badge); }
   if (view.regulation) { const badge = el('span', view.regulation.label, 'regulation-badge'); badge.setAttribute('aria-label', view.regulation.aria); badge.title = view.regulation.aria; nodes.push(badge); }
   if (view.matchNote) nodes.push(el('span', view.matchNote, 'match-note muted'));
   return nodes;
@@ -451,7 +456,8 @@ function renderAlternatives(): void {
     const item = el('li'); const control = button('', () => chooseAlternative(entry), 'alternative-item');
     const view = candidateView(entry.card); const urls = thumbnailUrls(entry.card);
     if (urls.length) { const image = el('img'); image.alt = ''; image.width = 48; image.height = 67; image.decoding = 'async'; image.referrerPolicy = 'no-referrer'; let next = 0; image.onerror = () => { if (++next < urls.length) image.src = urls[next]!; else image.remove(); }; image.src = urls[0]!; control.append(image); }
-    const text = el('span', '', 'alternative-text'); text.append(el('strong', view.name), el('span', view.expansion, 'small'), el('span', `類似度 ${entry.score.toFixed(3)}${entry.current ? ' · 現在の候補' : ''}`, 'small muted'));
+    const text = el('span', '', 'alternative-text'); const nameLine = el('span', '', 'name-line'); nameLine.append(el('strong', view.name), ...rarityNodes(view));
+    text.append(nameLine, el('span', view.expansion, 'small'), el('span', `類似度 ${entry.score.toFixed(3)}${entry.current ? ' · 現在の候補' : ''}`, 'small muted'));
     control.append(text); item.append(control); return item;
   }));
 }
