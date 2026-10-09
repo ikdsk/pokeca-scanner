@@ -156,7 +156,10 @@ test('branding, sources, rights and privacy text are Pokémon-specific; no MTG, 
   await expect(info).toContainText('ポケモンカードの権利は株式会社ポケモン等の権利者に帰属します');
   await info.getByText('通信・プライバシーの詳細').click();
   for (const text of ['api.tcgdex.net', 'assets.tcgdex.net', '/prices/pokemon-japan-usd.json', 'Frankfurter', 'Hugging Face', '晴れる屋2']) await expect(info).toContainText(text);
-  const text = (await page.locator('body').innerText()) + (await page.locator('.utility-drawer').innerText());
+  const sister = info.getByRole('link', { name: 'MTGカード版の Mana Peek もあります' });
+  await expect(sister).toHaveAttribute('href', 'https://ikdsk.github.io/mtg-card-scanner/'); await expect(sister).toHaveAttribute('target', '_blank'); await expect(sister).toHaveAttribute('rel', 'noopener noreferrer');
+  // The sister-app link intentionally names MTG; strip it so the leftover-MTG check still covers everything else.
+  const text = ((await page.locator('body').innerText()) + (await page.locator('.utility-drawer').innerText())).replaceAll('MTGカード版の Mana Peek もあります', '');
   for (const banned of ['MTG', 'Scryfall', 'Oracle', 'Wizards', 'フォーマット', 'Foil']) expect(text).not.toContain(banned);
   await closeRoute(page);
   await expect(page.getByRole('searchbox')).toHaveCount(0); await expect(page.locator('.format-icon, .format-legality, .intro-logo')).toHaveCount(0);
