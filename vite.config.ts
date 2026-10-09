@@ -27,6 +27,8 @@ function catalogTransport(server: Pick<ViteDevServer, 'middlewares'>, root: stri
   });
 }
 export default defineConfig({
+  // GitHub Pages serves this as a project page under /pokeca-scanner/, not the domain root.
+  base: process.env.GITHUB_PAGES_BASE ?? '/',
   server: { host: '127.0.0.1' }, build: { target: 'es2022' },
   plugins: [{
     name: 'catalog-compressed-asset-transport',
