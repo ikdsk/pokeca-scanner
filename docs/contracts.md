@@ -66,3 +66,17 @@ quote(tcgplayerId, groupId?, signal): Promise<UsdQuote[]>
   attacks[{cost[],name,effect,damage}], weaknesses/resistances[{type,value}], retreat, description;
   Trainer: trainerType, effect; Energy: energyType, effect. Malformed items dropped; never invented.
 - Shown only in the detail sheet; absent → 「カードテキストは未収録です」.
+
+## Public release (2026-10-09)
+- Public hosting and distribution of this application, and making this repository public, were explicitly
+  approved by the user (2026-10-09), who stated that real-device operation was already checked. The detailed
+  device measurements were not shared with the repository; QA-P1 (#6) has no `docs/qa/*-review.md` report.
+  Human device tests remain NOT RUN in the repository record.
+- Licence: the whole repository is AGPL-3.0-or-later (`LICENSE`; `package.json` `license`), because the
+  vendored CollectorVision scanner, Cornelius and Milo are AGPL-3.0. The public GitHub repository is the
+  Corresponding Source offer. Details: `public/recognition/THIRD-PARTY-NOTICES.md` ("Public release").
+- Unchanged product constraints: overseas TCGplayer USD reference + approximate JPY (never a domestic price);
+  Hareruya2 is a search link only (no fetch/store/redisplay); `pokemon-japan` is a CollectorVision PREVIEW
+  catalog with unestablished accuracy; no camera image upload; no fabricated prices or recognition results.
+- Deploy prerequisite (coordinator): `public/prices/pokemon-japan-usd.json` is git-ignored and must be generated
+  (`npm run prices:snapshot`) and served from the app's own origin at deploy time.

@@ -1,124 +1,90 @@
-# Pokéca Scanner — ポケモンカード（日本語版）スキャナー
+# Pokéca Scanner 🔍
 
-MTG版スキャナー（Mana Peek, `ikdsk/mtg-card-scanner` release/issue22）をベースにした開発中のポケカ版です。
-開発計画は `docs/development-plan.md`、契約は `docs/contracts.md`、運用は `AGENTS.md`。
-**現時点のコードはMTG版のままで、ポケカ対応はIssue #2〜#5で進行中です。** 以下はMTG版から引き継いだ手順です。
+ポケモンカード（日本語版）にスマホのカメラをかざすだけで、日本語のカード名・カードテキスト・参考価格をすぐ確認できるカードスキャナーです。
+すべての認識はブラウザ内で行い、カメラ画像を外部へ送信しません。
 
----
+姉妹アプリ：MTG版の [Mana Peek](https://ikdsk.github.io/mtg-card-scanner/)（同じ操作感です）
 
-# MTG Card Scanner — ローカル検証用MVP
+## できること
 
-Vite + TypeScriptの日本語モバイルUI。端末内のCollectorVision/WASM認識、
-カメラ・端末画像・日本語/英語検索、Scryfall印刷版/言語/加工とUSD参考価格、
-Frankfurter/ECBの公表USD/JPYを接続しています。
+- 📷 **カメラをかざすだけ**：確認操作なしで、日本語のカード名、収録セット・番号、レアリティ、参考価格を表示します
+- 🇯🇵 **日本語メタデータ**：[TCGdex](https://tcgdex.dev) の日本語データから、カード名・セット名・カードテキストを表示します。突合できないカードは表示しません
+- 💰 **参考価格（USD / JPY 概算）**：TCGplayer の USD 価格と、Frankfurter/ECB の為替レートから算出します
+- 🔖 **任意保存の履歴**：気になったカードだけ「履歴に保存」します。自動保存はしません
+- 🔁 **他の候補と別商品**：似ているカードの候補（最大 4 件）や、同じカードの別商品を見比べられます
+- 🔗 **晴れる屋2の検索リンク**：カード名・番号での検索結果をワンタップで開けます
+- 🖼️ **端末の画像でスキャン**：カメラが使えない場面でも、端末内の画像から認識できます（画像は端末内だけで処理します）
 
-**実Chromiumでのブラウザ12ケース（合成API応答）はPASS。**
-ビルド成功やmockテストは実カード精度・スマホ性能の証明ではありません。
-修正・実モデル／ライブAPIの結果は `docs/reports/mvp-fix.md`。
-`docs/reports/mvp-implementation.md` は初回実装時の環境制約を記録した履歴です。
+## 使い方（かざす → 見る → 任意保存）
 
-## 起動（Node 24）
+1. 「スキャン開始」をタップしてカメラを起動し、カード全体を画面に収めます
+2. カードを認識すると、確認操作なしで情報を表示します
+3. カード名や画像をタップすると詳細シートが開きます
+4. 残したいカードだけ「履歴に保存」します
+
+## 利用上の注意点
+
+- **認識精度は検証中です**。認識には CollectorVision の `pokemon-japan` カタログを使っていますが、CollectorVision は MTG 以外のカタログを「PREVIEW」（MTG ほど検証されていない）と位置づけています。実物のカードでの精度、同じセット・番号の別商品（モンスターボールミラー等）、レアリティ違い、状態の違いの判別は確立していません。必ず実物のカードと画面の表示を照合してください。
+- **価格は海外の参考価格です**。TCGplayer の USD 価格（市場価格）と概算の JPY を表示します。国内の販売・買取価格とは異なる場合があります。価格が見つからない場合や、同じ商品に複数の種類（通常・ホロ等）があって対応づけを一意に決められない場合は、推測せずに価格を表示しません。0 は実際の価格、価格なしは「なし」と区別して扱います。為替を取得できなければ USD のみを表示します（固定レートは使いません）。価格はビルド時に作成したスナップショット（TCGCSV 経由）から読み込むため、リアルタイムではありません。提供元の更新時刻を表示します。
+- **参考画像を表示します**。TCGdex（`assets.tcgdex.net`）の画像を、無ければ TCGplayer の商品画像を、提供元から直接読み込んで表示します（保存・再配布はしません）。画像の提供元を画像の横に表示します。カード画像・名称・テキスト・イラストの権利は株式会社ポケモン等の権利者に帰属します。
+- **晴れる屋2へのリンクは検索用だけです**。リンクをタップするまで晴れる屋2へは通信せず、価格や内容の取得・保存・再表示は行いません。
+- 履歴は、開いているタブの中だけに保持します（最新 100 件まで、再読み込みで消えます）。
+- 画像と特徴量は外部へ送信しません。アカウント機能と解析（アナリティクス）はありません。通信先は、認識用コード・モデル・辞書の配信元（jsDelivr、Hugging Face、CollectorVisionCatalog）、TCGdex（セット名・番号を送信）、参考画像の配信元、Frankfurter（為替ペアを送信）です。
+- ダーク/ライト表示は OS の設定に追従します。
+
+## 動かしてみる（開発者向け）
+
+Node.js 24 が必要です。
 
 ```sh
 npm ci
+npm run prices:snapshot   # 価格スナップショットを作成（public/prices/、git 管理外）
 npm run dev -- --port 4187 --strictPort
 ```
 
-`http://localhost:4187` を開きます。モデルは「カメラでスキャン」または
-画像選択後に初めてダウンロードされます。名前検索にモデルは不要です。
-初回資源はモデル約9.6MB、辞書約35.6MB、別途ONNX Runtime。
-キャッシュの永続性はブラウザ容量・プライベートモード等に依存します。
+`http://localhost:4187` を開きます。認識モデルは、「スキャン開始」または画像選択の時点で初めてダウンロードします。
+価格スナップショットが無い場合、価格は表示されません。
 
-カメラはHTTPSまたはlocalhostのsecure contextと明示許可が必要です。
-スマホからPCのHTTP/LAN IPへ接続してもカメラは通常使えません。
-実機試験は適切なHTTPS環境をコーディネータが準備してください。
-このタスクは公開デプロイ・LAN公開・証明書警告の回避を許可していません。
+カメラを使うには、HTTPS（または localhost）の secure context と、ブラウザの明示的な許可が必要です。
+スマホの実機で試す場合は、HTTPS でアクセスできる環境を別途用意してください。
+
+### テストを動かす
 
 ```sh
-npm run check
+npm run check        # 型チェック + 単体テスト
 npm run build
-npm run preview -- --port 4187 --strictPort
 npx playwright install chromium
-npm run test:e2e
+npm run test:e2e     # ブラウザE2Eテスト（desktop + 390×844 mobile viewport）
 ```
 
-Playwrightはdesktopと390×844のmobile viewport、合成API応答での検索、
-日本語表示、版/言語/加工、null/0、FX障害、カメラ拒否を試します。
-mobile viewportは実機Safari/Chromeではありません。
-Chromeを明示する場合は `PLAYWRIGHT_CHROME_PATH` に実行ファイルを指定。
-通常はPlaywright付属のfull Chromium（channel: chromium）を使います。
-E2Eはbuild済みdistを専用4187で配信し、既存サーバーを再利用しません。
-`MVP_PORT`で変更できます。E2E前に必ず`npm run build`を実行してください。
+E2E は `npm run preview` でビルド済みの静的ファイルを専用ポート（既定 4187、`MVP_PORT` で変更可）で配信します。実行前に `npm run build` を実行してください。
+E2E の応答は合成（SYNTHETIC）です。実カードでの認識精度やスマホでの性能を示すものではありません。
 
-ローカル待受けが不要なmock試験も用意しています（実ビルドを
-Playwright routeで応答。実カメラ・ネットワークの代替にはなりません）：
-
-```sh
-npm run build
-PLAYWRIGHT_NO_SERVER=1 npm run test:e2e
-```
-
-## 実モデル/プロバイダの再現試験
-
-ブラウザが配信元にアクセスできない場合、許可済みの固定資源をローカルに
-取得できます。ローカル配信は辞書gzipをHTTP自動展開させず、その圧縮bytesを検証します。
-モデル・辞書のサイズ/SHA-256を検証し、`.partial`から
-完成ファイルへ切替。失敗時は既存の完成ファイルを破壊しません。
+### 実モデルでの再現確認
 
 ```sh
 npm run assets:prepare
 npm run dev -- --port 4187 --strictPort
 ```
 
-`http://localhost:4187/?localAssets` を開きます。資源は無視対象の
-`public/recognition/assets/` と `public/recognition/vendor/`。
-**モデル・辞書・カード画像をgitに追加しないでください。**
-Runtimeはバージョン固定URLで取得し、取得後のハッシュを記録します。
-Runtime本体の事前既知ハッシュ照合は未実装で、モデル/辞書の照合と区別します。
-公式v1.24.3のLICENSE・ThirdPartyNotices.txtは既知SHA-256を照合して保存します。
+`http://localhost:4187/?localAssets` を開くと、ローカルにダウンロード済みの認識モデルと辞書資源を使えます（サイズと SHA-256 を検証します）。
+モデル、辞書、カード画像自体はリポジトリに含まれません。
 
-```sh
-npm run evidence:live
-```
+## 技術構成
 
-公開参照画像manifestの`latest-ja`を読み取り、実ブラウザのファイル入力→
-実モデル→候補、その後ライブ検索/価格/FXを試します。raw応答・計測・画面を
-`artifacts/live/<label>/` に保存します。ネットワーク、localhost待受け、ブラウザの
-起動権限が必要です。既定manifestは `/Users/dikeda/workspace/mtg-card-scanner-research/mvp-fixtures/manifest.json`。
-`MVP_FIXTURE_MANIFEST`と`MVP_FIXTURE_LABEL`で公開参照fixtureを指定できます。
-ビルド済みアプリを4187で配信します（先に`npm run build`）。
-独立写真精度・スマホ性能・多数回測定の代替にはなりません。
+- Vite + TypeScript のフロントエンド。サーバーを持たない静的サイトです
+- 認識：[CollectorVision](https://github.com/HanClinto/CollectorVision)（ONNX Runtime Web、WASM）をブラウザ内で実行。カタログは `tcgplayer/pokemon-japan`、結果の ID は TCGplayer の商品 ID です
+- 日本語データ：TCGdex `ja` API、価格：TCGCSV（TCGplayer ミラー）のスナップショット、為替：Frankfurter/ECB
 
-辞書更新失敗／復旧の制御試験は `node scripts/catalog-fallback-evidence.mjs`。
-実モデル・検証済みv51資源・実IndexedDBを使い、feed切替とHTTP503だけを合成します。
-互換モデルhashの旧完全snapshotのみ復旧対象で、途中の更新結果は有効化しません。
+## ライセンスとクレジット
 
-## 情報と利用上の制限
+本リポジトリ全体を **[AGPL-3.0-or-later](LICENSE)** でライセンスしています。
 
-- 認識はカードの候補です。実物の版・言語・加工を必ず手動確認してください。
-  日本語公開参照画像の稲妻ではOracle同一性が一致しましたが、版・言語は一致しません。
-  最新日本語参照画像と背景付き派生画像は閾値未達で棄却。
-  実物写真、特殊枠、反射、Foil等の精度は未検証です。
-- 日本語**印刷**本文と英語**Oracle**本文を別表示。表示用日本語版は
-  選択価格対象と独立し、取得元のセット/番号を表示します。
-- 価格は選択したScryfall IDと加工のUSD欄のみ。日本語価格が欠けても
-  英語価格へ自動置換しません。0は実価格、nullは価格なし。
-- USDは海外参考価格で国内販売/買取価格ではありません。JPYは概算。
-  為替を取得できなければUSDのみ。固定レートはありません。
-- Scryfallは検索系510ms・他110ms以上の共有間隔。429後は最低30.1秒待機し、
-  長いRetry-Afterを尊重。検証済み応答だけ24時間のタブ内cache、FXは1時間。
-  HTTPは12秒timeout、429は自動連打せず手動再試行。価格の応答確認時刻と
-  提供元の価格更新時刻は区別し、提供元更新時刻は未取得と表示します。
-- 画像/特徴量の外部送信・アカウント・解析analyticsなし。
-  モデル配信元、カードID/検索語、為替ペアへの通信はあります。
-- 結果固定・背景・ページ離脱でカメラを解放。背景からはボタンで再開。
-- ダーク/ライトはOS設定に追従。初期シェルにモデルを含めません。
+認識エンジン（[CollectorVision](https://github.com/HanClinto/CollectorVision)、HanClinto 氏）と認識モデル（Cornelius、Milo）が AGPL-3.0 のため、ネットワーク経由で利用可能にする場合は、利用者へ Corresponding Source を提供する義務があります。
+本リポジトリを公開することで、この義務を満たしています。
+出典と各ライブラリの条件の詳細は [`public/recognition/THIRD-PARTY-NOTICES.md`](public/recognition/THIRD-PARTY-NOTICES.md) に記載しています。
 
-## ライセンス/公開
+素晴らしい認識基盤を公開してくださっている HanClinto 氏と、Cornelius / Milo の作者の方々に感謝します。
 
-`public/recognition/THIRD-PARTY-NOTICES.md` にコード、モデル、辞書、画像、
-APIの条件を分離して記載。CollectorVisionのAGPL全文を同梱し、変更を明示。
-別ライセンスは取得していません。MIT扱いにしていません。
-ローカル/内部実験のみ。公開ネットワーク利用・配布にはユーザーの明示承認、
-AGPLのCorresponding Source提供を含む適合判断、モデル/辞書/画像条件の
-確認が必要です。private GitHubは公開アプリ許可やsource提供義務の代替ではありません。
+ポケモンカードの名称、テキスト、画像、トレードマークは、株式会社ポケモン等の権利者の所有物です。
+本プロジェクトはこれらの権利者と提携しておらず、公認も受けていません。

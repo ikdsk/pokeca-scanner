@@ -61,7 +61,7 @@ const sources = el('p');
 for (const [name, href] of [['TCGdex', 'https://tcgdex.dev'], ['TCGplayer（TCGCSV経由）', 'https://tcgcsv.com'], ['Frankfurter / ECB', 'https://frankfurter.dev'], ['CollectorVision', 'https://github.com/HanClinto/CollectorVision']]) {
   const a = el('a', name); a.href = href!; a.target = '_blank'; a.rel = 'noopener noreferrer'; sources.append(a, document.createTextNode(' · '));
 }
-footer.append(sources, el('p', 'ローカル・内部検証版。認識コードとモデルはAGPL-3.0。公開・配布前にライセンス対応と公開承認が必要です。ポケモンカードの権利は株式会社ポケモン等の権利者に帰属します。', 'small'));
+footer.append(sources, el('p', 'このアプリと認識コード・モデルはAGPL-3.0でライセンスされています。ポケモンカードの権利は株式会社ポケモン等の権利者に帰属します。', 'small'));
 const notices = el('a', '第三者ライセンスと利用条件'); notices.href = '/recognition/THIRD-PARTY-NOTICES.md'; footer.append(notices);
 const privacy = el('details'); privacy.append(el('summary', '通信・プライバシーの詳細'), el('p', '候補カードのセット名・番号をTCGdex（api.tcgdex.net）に送信し、参照画像はassets.tcgdex.netから取得します。価格はTCGCSV由来のスナップショットをこのアプリ自身の配信元（/prices/pokemon-japan-usd.json）から読み込み、価格取得のために外部へ送信しません。USD/JPYの通貨ペアをFrankfurterに送信します。認識用のコード・モデル・辞書はjsDelivr、Hugging Face、CollectorVisionCatalogから取得します。提供元には通常の通信情報が渡ります。晴れる屋2はリンクをタップするまで通信せず、価格や内容の取得・保存・再表示はしません。撮影・選択画像は保存・送信せず、解析ログはこのタブのメモリ内のみです。分析サービスへの送信はありません。'));
 footer.append(privacy);
