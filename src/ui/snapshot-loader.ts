@@ -1,4 +1,4 @@
-export const SNAPSHOT_URL = '/prices/pokemon-japan-usd.json';
+export const SNAPSHOT_URL = `${import.meta.env.BASE_URL}prices/pokemon-japan-usd.json`;
 export class SnapshotMissingError extends Error {
   constructor() { super('価格スナップショットがありません'); this.name = 'SnapshotMissingError'; }
 }
