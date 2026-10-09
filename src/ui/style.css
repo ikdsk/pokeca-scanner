@@ -87,6 +87,7 @@ html,body{width:100%;height:100%;overflow:hidden;overscroll-behavior:none}
 /* Intro uses the idle camera space; lifecycle and model status stay separate. */
 .camera-intro{position:absolute;inset:76px 20px 52px;display:flex;flex-direction:column;justify-content:center;max-width:480px;margin-inline:auto;color:#f0f1f5;pointer-events:none}
 .camera-intro h2{font-size:1.9rem;margin:0 0 16px}.camera-intro p{margin:0 0 12px;line-height:1.7;overflow-wrap:anywhere}
+.camera-intro .intro-sister a{color:#fff;text-decoration:underline;text-underline-offset:3px;pointer-events:auto}
 /* Entry hint: arrow under the scan button, only while the intro is visible. */
 .start-hint{display:flex;align-items:center;gap:8px;margin:4px 0 0 28px;width:max-content;max-width:100%;color:#fff;font-size:.9rem;font-weight:700;pointer-events:none;text-shadow:0 1px 4px #000c}
 .start-hint svg{flex:none}

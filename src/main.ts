@@ -39,6 +39,7 @@ const overlayCanvas = el('canvas', '', 'detection-overlay'); overlayCanvas.setAt
 const overlay = new DetectionOverlay(overlayCanvas, video);
 const cameraIntro = el('div', '', 'camera-intro');
 cameraIntro.append(el('h2', 'ポケカスキャナー'), el('p', 'ポケモンカードをかざして、日本語情報や参考価格を確認。'), el('p', '結果をタップすると詳細が開きます。残したいカードは「履歴に保存」。', 'small'));
+const introSister = el('p', '', 'small intro-sister'); const introSisterLink = el('a', 'MTG版はこちら →'); introSisterLink.href = 'https://ikdsk.github.io/mtg-card-scanner/'; introSisterLink.target = '_blank'; introSisterLink.rel = 'noopener noreferrer'; introSister.append(introSisterLink); cameraIntro.append(introSister);
 // Points up at the scan button; shown exactly when the intro is (camera stopped).
 const startHint = el('div', '', 'start-hint'); startHint.append(upArrowIcon(), el('span', 'タップしてスタート！'));
 function showIntro(visible: boolean): void { cameraIntro.hidden = !visible; startHint.hidden = !visible; }
