@@ -30,3 +30,11 @@ test('worker retains init sent while runtime module import is pending (SYNTHETIC
   expect(messages).toContain('progress');
   expect(messages).toContain('error'); // Invalid fixture manifest must reach validation.
 });
+
+test('no analytics beacon is injected on local hosts', async ({ page }) => {
+  const beaconRequests: string[] = [];
+  page.on('request', r => { if (r.url().includes('cloudflareinsights.com')) beaconRequests.push(r.url()); });
+  await page.goto('/'); await page.waitForLoadState('networkidle');
+  await expect(page.locator('script[data-cf-beacon]')).toHaveCount(0);
+  expect(beaconRequests).toEqual([]);
+});
