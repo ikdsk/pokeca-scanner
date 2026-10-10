@@ -24,6 +24,18 @@ import { defaults, bounds, validateSettings, type RecognitionSettings } from './
 import { CandidateMetadata } from './ui/candidate-metadata.js';
 import { DetectionOverlay } from './ui/detection-overlay.js';
 import { captureCameraFrame } from './ui/camera-geometry.js';
+import { isPokecaPublicSite } from './analytics.js';
+
+// Anonymous page-view counting (Cloudflare Web Analytics) only on the public GitHub Pages deployment,
+// never on local dev or the Tailscale preview. No cookies, no cross-site tracking, no image/feature data.
+// This token is dedicated to Pokéca Scanner. Mana Peek (/mtg-card-scanner/) shares the host ikdsk.github.io
+// but has its own Web Analytics site, so the path is checked too to keep the two measurements separate.
+if (isPokecaPublicSite(location)) {
+  const beacon = document.createElement('script');
+  beacon.defer = true; beacon.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+  beacon.setAttribute('data-cf-beacon', JSON.stringify({ token: '54404ff142394c16a4e7ae1d54a95697' }));
+  document.head.append(beacon);
+}
 
 const marks: { event: string; ms: number; detail?: unknown }[] = [];
 function mark(event: string, detail?: unknown): void { marks.push({ event, ms: performance.now(), detail }); if (marks.length > 300) marks.shift(); performance.clearMarks(event); performance.mark(event); }
@@ -65,7 +77,7 @@ for (const [name, href] of [['TCGdex', 'https://tcgdex.dev'], ['TCGplayer（TCGC
 footer.append(sources, el('p', 'このアプリと認識コード・モデルはAGPL-3.0でライセンスされています。ポケモンカードの権利は株式会社ポケモン等の権利者に帰属します。', 'small'));
 const sister = el('p', '', 'small sister-app'); const sisterLink = el('a', 'MTGカード版の Mana Peek もあります'); sisterLink.href = 'https://ikdsk.github.io/mtg-card-scanner/'; sisterLink.target = '_blank'; sisterLink.rel = 'noopener noreferrer'; sister.append(sisterLink); footer.append(sister);
 const notices = el('a', '第三者ライセンスと利用条件'); notices.href = `${import.meta.env.BASE_URL}recognition/THIRD-PARTY-NOTICES.md`; footer.append(notices);
-const privacy = el('details'); privacy.append(el('summary', '通信・プライバシーの詳細'), el('p', '候補カードのセット名・番号をTCGdex（api.tcgdex.net）に送信し、参照画像はassets.tcgdex.netから取得します。価格はTCGCSV由来のスナップショットをこのアプリ自身の配信元（/prices/pokemon-japan-usd.json）から読み込み、価格取得のために外部へ送信しません。USD/JPYの通貨ペアをFrankfurterに送信します。認識用のコード・モデル・辞書はjsDelivr、Hugging Face、CollectorVisionCatalogから取得します。提供元には通常の通信情報が渡ります。晴れる屋2はリンクをタップするまで通信せず、価格や内容の取得・保存・再表示はしません。撮影・選択画像は保存・送信せず、解析ログはこのタブのメモリ内のみです。分析サービスへの送信はありません。'));
+const privacy = el('details'); privacy.append(el('summary', '通信・プライバシーの詳細'), el('p', '候補カードのセット名・番号をTCGdex（api.tcgdex.net）に送信し、参照画像はassets.tcgdex.netから取得します。価格はTCGCSV由来のスナップショットをこのアプリ自身の配信元（/prices/pokemon-japan-usd.json）から読み込み、価格取得のために外部へ送信しません。USD/JPYの通貨ペアをFrankfurterに送信します。認識用のコード・モデル・辞書はjsDelivr、Hugging Face、CollectorVisionCatalogから取得します。提供元には通常の通信情報が渡ります。晴れる屋2はリンクをタップするまで通信せず、価格や内容の取得・保存・再表示はしません。撮影・選択画像は保存・送信せず、解析ログはこのタブのメモリ内のみです。公開サイト（ikdsk.github.io/pokeca-scanner/）ではCloudflare Web Analyticsによる匿名のページビュー計測のみ行い、Cookie不要・個人を識別する情報は送信しません（ローカル環境では計測しません）。'));
 footer.append(privacy);
 const debug = el('details'); debug.append(el('summary', '端末内の計測ログ')); const debugOutput = el('pre');
 debug.append(button('計測を表示', () => { debugOutput.textContent = JSON.stringify(marks, null, 2); }), debugOutput); footer.append(debug);
